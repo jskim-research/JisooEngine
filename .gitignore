@@ -1,0 +1,14 @@
+# Visual Studio local state
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.VC.db
+*.VC.VC.opendb
+*.ipch
+
+# Generated files and build/package output
+/Intermediate/
+/Binaries/
+/out/

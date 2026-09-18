@@ -12,3 +12,7 @@
 /Intermediate/
 /Binaries/
 /out/
+
+# AI-Generated Files
+docs/learning
+docs/decisions

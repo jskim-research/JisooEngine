@@ -1,43 +1,8 @@
 #include "Runtime/EngineLoop.h"
 
-#include <Windows.h>
-
-#include <iostream>
-#include <string>
-
-namespace
+int FEngineLoop::Run()
 {
-    void InitializeConsole()
-    {
-        if (GetConsoleWindow() != nullptr)
-        {
-            return;
-        }
-
-        if (!AttachConsole(ATTACH_PARENT_PROCESS) && !AllocConsole())
-        {
-            return;
-        }
-
-        FILE* ConsoleOutput = nullptr;
-        freopen_s(&ConsoleOutput, "CONOUT$", "w", stdout);
-    }
-
-    void PrintLine(std::wstring_view Message)
-    {
-        std::wstring Output{Message};
-        Output.push_back(L'\n');
-
-        OutputDebugStringW(Output.c_str());
-        std::wcout << Output;
-    }
-}
-
-int FEngineLoop::Run(std::wstring_view InApplicationName)
-{
-    InitializeConsole();
-
-    if (!Initialize(InApplicationName))
+    if (!Initialize())
     {
         return -1;
     }
@@ -47,19 +12,15 @@ int FEngineLoop::Run(std::wstring_view InApplicationName)
     return 0;
 }
 
-bool FEngineLoop::Initialize(std::wstring_view InApplicationName)
+bool FEngineLoop::Initialize()
 {
-    ApplicationName = InApplicationName;
-    PrintLine(L"[" + std::wstring{ApplicationName} + L"] FEngineLoop::Initialize");
     return true;
 }
 
 void FEngineLoop::Tick()
 {
-    PrintLine(L"[" + std::wstring{ApplicationName} + L"] FEngineLoop::Tick");
 }
 
 void FEngineLoop::Shutdown()
 {
-    PrintLine(L"[" + std::wstring{ApplicationName} + L"] FEngineLoop::Shutdown");
 }

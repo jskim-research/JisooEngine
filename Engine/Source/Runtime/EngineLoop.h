@@ -1,17 +1,12 @@
 #pragma once
 
-#include <string_view>
-
 class FEngineLoop
 {
 public:
-    int Run(std::wstring_view ApplicationName);
+    int Run();
 
 private:
-    bool Initialize(std::wstring_view ApplicationName);
+    bool Initialize();
     void Tick();
     void Shutdown();
-
-private:
-    std::wstring_view ApplicationName;
 };

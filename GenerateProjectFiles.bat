@@ -2,7 +2,7 @@
 setlocal
 
 for %%I in ("%~dp0.") do set "ROOT_DIR=%%~fI"
-set "PROJECT_FILES_DIR=%ROOT_DIR%\Intermediate\ProjectFiles"
+set "BUILD_DIR=%ROOT_DIR%\Intermediate\Build\VS2022-x64"
 
 where cmake >nul 2>&1
 if errorlevel 1 (
@@ -10,7 +10,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-cmake -S "%ROOT_DIR%" -B "%PROJECT_FILES_DIR%" -A x64 %*
+cmake -S "%ROOT_DIR%" -B "%BUILD_DIR%" -G "Visual Studio 17 2022" -A x64 %*
 if errorlevel 1 (
     echo [Error] Failed to generate Visual Studio project files.
     exit /b 1
@@ -18,6 +18,6 @@ if errorlevel 1 (
 
 echo.
 echo Project generation completed.
-echo Solution: %PROJECT_FILES_DIR%\JisooEngine.sln
+echo Solution: %BUILD_DIR%\JisooEngine.sln
 
 endlocal

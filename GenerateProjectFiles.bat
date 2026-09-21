@@ -2,7 +2,7 @@
 setlocal
 
 for %%I in ("%~dp0.") do set "ROOT_DIR=%%~fI"
-set "BUILD_DIR=%ROOT_DIR%\Intermediate\Build\VS2022-x64"
+set "BUILD_DIR=%ROOT_DIR%\Build\VS2022-x64"
 
 where cmake >nul 2>&1
 if errorlevel 1 (

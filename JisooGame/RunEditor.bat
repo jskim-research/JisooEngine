@@ -1,8 +1,8 @@
 @echo off
 setlocal
 
-for %%I in ("%~dp0.") do set "ROOT_DIR=%%~fI"
-set "BUILD_DIR=%ROOT_DIR%\Intermediate\Build\VS2022-x64"
+for %%I in ("%~dp0..") do set "ROOT_DIR=%%~fI"
+set "BUILD_DIR=%ROOT_DIR%\Build\VS2022-x64"
 set "SOLUTION_PATH=%BUILD_DIR%\JisooEngine.sln"
 set "CONFIGURATION=%~1"
 
@@ -24,27 +24,27 @@ if not exist "%SOLUTION_PATH%" (
     if errorlevel 1 exit /b 1
 )
 
-echo Building JisooEditor ^(%CONFIGURATION%^)...
-cmake --build "%BUILD_DIR%" --config "%CONFIGURATION%" --target JisooEditor
+echo Building JisooGameEditor ^(%CONFIGURATION%^)...
+cmake --build "%BUILD_DIR%" --config "%CONFIGURATION%" --target JisooGameEditor
 if errorlevel 1 (
     echo [Error] Editor build failed.
     exit /b 1
 )
 
-set "EDITOR_PATH=%ROOT_DIR%\Binaries\Win64\%CONFIGURATION%\JisooEditor.exe"
+set "EDITOR_PATH=%ROOT_DIR%\JisooGame\Binaries\Win64\%CONFIGURATION%\JisooGameEditor.exe"
 if not exist "%EDITOR_PATH%" (
     echo [Error] Editor executable was not found: %EDITOR_PATH%
     exit /b 1
 )
 
-echo Starting JisooEditor...
+echo Starting JisooGameEditor...
 pushd "%ROOT_DIR%"
 start "" "%EDITOR_PATH%"
 set "START_RESULT=%ERRORLEVEL%"
 popd
 
 if not "%START_RESULT%"=="0" (
-    echo [Error] Failed to start JisooEditor.
+    echo [Error] Failed to start JisooGameEditor.
     exit /b 1
 )
 

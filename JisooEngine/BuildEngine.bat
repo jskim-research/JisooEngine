@@ -1,8 +1,8 @@
 @echo off
 setlocal
 
-for %%I in ("%~dp0.") do set "ROOT_DIR=%%~fI"
-set "BUILD_DIR=%ROOT_DIR%\Intermediate\Build\VS2022-x64"
+for %%I in ("%~dp0..") do set "ROOT_DIR=%%~fI"
+set "BUILD_DIR=%ROOT_DIR%\Build\VS2022-x64"
 set "SOLUTION_PATH=%BUILD_DIR%\JisooEngine.sln"
 set "CONFIGURATION=%~1"
 
@@ -24,15 +24,15 @@ if not exist "%SOLUTION_PATH%" (
     if errorlevel 1 exit /b 1
 )
 
-echo Building JisooEngine ^(%CONFIGURATION%^)...
-cmake --build "%BUILD_DIR%" --config "%CONFIGURATION%" --target ALL_BUILD
+echo Building JisooEngine modules ^(%CONFIGURATION%^)...
+cmake --build "%BUILD_DIR%" --config "%CONFIGURATION%" --target JisooEngineEditor
 if errorlevel 1 (
-    echo [Error] Build failed.
+    echo [Error] Engine build failed.
     exit /b 1
 )
 
 echo.
-echo Build completed.
-echo Binaries: %ROOT_DIR%\Binaries\Win64\%CONFIGURATION%
+echo Engine modules built successfully.
+echo Libraries: %ROOT_DIR%\JisooEngine\Intermediate\Libraries\Win64\%CONFIGURATION%
 
 endlocal

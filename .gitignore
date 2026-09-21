@@ -8,9 +8,12 @@
 *.VC.VC.opendb
 *.ipch
 
-# Generated files and build/package output
-/Intermediate/
-/Binaries/
+# Generated workspace and product output
+/Build/
+/JisooEngine/Intermediate/
+/JisooEngine/Binaries/
+/JisooGame/Intermediate/
+/JisooGame/Binaries/
 /out/
 
 # AI-Generated Files

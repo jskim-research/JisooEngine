@@ -2,7 +2,7 @@
 setlocal
 
 for %%I in ("%~dp0.") do set "ROOT_DIR=%%~fI"
-set "SOLUTION_PATH=%ROOT_DIR%\Intermediate\Build\VS2022-x64\JisooEngine.sln"
+set "SOLUTION_PATH=%ROOT_DIR%\Build\VS2022-x64\JisooEngine.sln"
 
 if not exist "%SOLUTION_PATH%" (
     echo Visual Studio project files were not found. Generating them now...

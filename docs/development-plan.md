@@ -18,7 +18,7 @@
 
 | 항목 | 구현 범위 |
 |---|---|
-| 빌드·모듈 | 프로젝트 생성 자동화, Debug/Release, Engine·Editor·실행 앱 책임 분리. 라이브러리/DLL 구성은 미정 |
+| 빌드·모듈 | 프로젝트 생성 자동화, Debug/Release, 통합 CMake와 정적 링크. 공통 진입점으로 프로젝트 전용 Editor·Game 실행 파일 구성. Engine Runtime·Editor 분리, Game 라이브러리는 실제 코드가 생길 때 추가. 동적 모듈은 보류 |
 | 엔진 구조 | World가 Actor를 소유하고 Actor가 Component를 소유. 생성·삭제·갱신·시작·종료와 참조 수명 명확화 |
 | 루프·변환 | 입력 → 이동·충돌 → 카메라 → 렌더링. 로컬/월드 변환과 Quaternion 회전 |
 | DX12 렌더러 | 기본 메시·깊이 렌더링, 셰이더·자원 업로드, Descriptor·Barrier·Fence와 자원 수명 관리 |

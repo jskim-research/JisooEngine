@@ -2,6 +2,10 @@
 
 JisooEngine의 모듈별 책임과 의존 방향을 정의한다. 새 코드를 배치하거나 모듈 사이의 참조를 추가할 때 이 문서를 기준으로 판단한다.
 
+## 소스 구조
+
+모듈과 소스 디렉터리 구조는 Unreal Engine 5의 구조를 기준으로 현재 프로젝트 규모에 맞게 단순화하여 적용한다. `Runtime`, `Editor` 같은 분류 디렉터리 바로 아래에는 소스 파일을 두지 않고, `Launch`, `Core`, `Rendering`처럼 책임이 명확한 하위 디렉터리에 배치한다.
+
 ## 모듈 책임
 
 | 모듈 | CMake 타깃 | 형태 | 책임 |
@@ -46,6 +50,5 @@ Engine 코드에서 Editor 또는 Game 타입이 필요해지면 구현을 진�
 
 | 실행 파일 | 진입점 | 사용하는 런타임 |
 |---|---|---|
-| `JisooEditor` | `Editor/Source/EditorMain.cpp` | Engine |
-| `JisooGame` | `Game/Source/GameMain.cpp` | Engine |
-
+| `JisooEditor` | `Editor/Source/Launch/EditorMain.cpp` | Engine |
+| `JisooGame` | `Game/Source/Launch/GameMain.cpp` | Engine |

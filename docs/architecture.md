@@ -16,6 +16,7 @@ Repository/
 │  │  ├─ main.cpp             # 두 실행 타깃이 각각 컴파일하는 공통 진입점
 │  │  ├─ Runtime/
 │  │  │  ├─ Launch/           # FEngineLoop
+│  │  │  ├─ Platform/Windows/ # 최소 Win32 창과 메시지 처리
 │  │  │  └─ Engine/           # FEngine, FGameEngine
 │  │  └─ Editor/
 │  │     └─ Engine/           # FEditorEngine
@@ -93,6 +94,7 @@ JisooGameEditor.exe
 |---|---|
 | 공통 실행 진입점과 구체 엔진 선택 | `JisooEngine/Source/main.cpp` |
 | 공통 실행 루프 | `JisooEngine/Source/Runtime/Launch` |
+| Windows 창 생성과 메시지 처리 | `JisooEngine/Source/Runtime/Platform/Windows` |
 | 범용 엔진 생명주기와 독립 게임 실행 관리 | `JisooEngine/Source/Runtime/Engine` |
 | 모든 게임에서 사용할 편집 기능 | `JisooEngine/Source/Editor` |
 | 보드 이동·벽면 주행 등 게임 고유 로직 | `JisooGame/Source/Runtime` |
@@ -130,4 +132,4 @@ JisooGame.exe       -> main.cpp -> FEngineLoop.Run(FGameEngine)
 JisooGameEditor.exe -> main.cpp -> FEngineLoop.Run(FEditorEngine)
 ```
 
-현재 엔진 구현은 초기화, 한 번의 Tick, 종료만 수행한다. 에디터 화면, 편집·플레이 월드 전환, 게임 콘텐츠 로딩·패키징은 아직 구현되지 않았다.
+현재 `FEngineLoop`는 최소 Win32 창을 생성하고 메시지를 처리하며, 창을 닫을 때까지 `FEngine::Tick`을 반복 호출한 뒤 종료한다. `FWindowsWindow`는 창과 네이티브 핸들을 소유하지만 범용 Application 계층은 두지 않는다. 렌더러, 에디터 화면, 편집·플레이 월드 전환, 게임 콘텐츠 로딩·패키징은 아직 구현되지 않았다.

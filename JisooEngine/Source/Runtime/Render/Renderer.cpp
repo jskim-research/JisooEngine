@@ -31,6 +31,7 @@ bool FRenderer::Initialize(
         }
     }
 
+    // CommandList 생성에는 Allocator가 필요하므로 첫 FrameResource의 Allocator를 초기 생성에 사용한다.
     if (!CommandContext.Initialize(
             Device.GetDevice(),
             FrameResources[0].GetCommandAllocator()) ||
@@ -103,6 +104,7 @@ bool FRenderer::Resize(std::uint32_t Width, std::uint32_t Height)
         return false;
     }
 
+    // ResizeBuffers 전에 BackBuffer를 참조하는 GPU 작업과 CPU 소유 참조를 모두 끝내야 한다.
     if (!CommandContext.WaitForGpu())
     {
         return false;
@@ -118,6 +120,7 @@ bool FRenderer::Resize(std::uint32_t Width, std::uint32_t Height)
 
 void FRenderer::Shutdown()
 {
+    // GPU가 참조할 수 있는 자원을 해제하기 전에 제출된 작업을 모두 완료한다.
     CommandContext.WaitForGpu();
 
     SwapChain.Shutdown();

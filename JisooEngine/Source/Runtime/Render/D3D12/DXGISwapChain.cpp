@@ -37,6 +37,8 @@ bool FDXGISwapChain::Initialize(
     SwapChainDescription.AlphaMode = DXGI_ALPHA_MODE_UNSPECIFIED;
 
     Microsoft::WRL::ComPtr<IDXGISwapChain1> BaseSwapChain;
+
+    // Fullscreen 전환 정책은 Engine이 관리하므로 DXGI의 기본 Alt+Enter 처리를 비활성화한다.
     if (FAILED(Factory->CreateSwapChainForHwnd(
             CommandQueue,
             WindowHandle,
@@ -87,6 +89,7 @@ bool FDXGISwapChain::Resize(
         return false;
     }
 
+    // ResizeBuffers는 기존 BackBuffer에 대한 모든 COM 참조가 해제된 상태를 요구한다.
     ReleaseRenderTargets();
 
     if (FAILED(SwapChain->ResizeBuffers(

@@ -5,6 +5,10 @@
 
 #include <cstdint>
 
+/**
+ * 한 Frame Slot에서 재사용하는 CommandAllocator와 마지막 제출 Fence 값을 함께 보관한다.
+ * Allocator는 저장된 Fence 값이 완료된 뒤에만 Reset할 수 있다.
+ */
 class FFrameResource
 {
 public:

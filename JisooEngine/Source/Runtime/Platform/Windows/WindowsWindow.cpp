@@ -45,6 +45,8 @@ bool FWindowsWindow::Initialize(const wchar_t* Title, std::uint32_t ClientWidth,
     };
 
     constexpr DWORD WindowStyle = WS_OVERLAPPEDWINDOW;
+
+    // 요청한 크기는 전체 Window가 아니라 Client Area에 적용되어야 한다.
     if (AdjustWindowRectEx(&WindowRectangle, WindowStyle, FALSE, 0) == FALSE)
     {
         Shutdown();
@@ -124,6 +126,7 @@ LRESULT CALLBACK FWindowsWindow::WindowProcedure(
     FWindowsWindow* Window = reinterpret_cast<FWindowsWindow*>(
         GetWindowLongPtrW(InWindowHandle, GWLP_USERDATA));
 
+    // CreateWindowExW로 전달한 this를 HWND에 연결해 이후 Message를 객체 상태로 처리한다.
     if (Message == WM_NCCREATE)
     {
         const auto* CreateStructure = reinterpret_cast<const CREATESTRUCTW*>(LParam);

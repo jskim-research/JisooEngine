@@ -31,6 +31,8 @@ int FEngineLoop::Run(FEngine& Engine)
     while (Window.ProcessMessages())
     {
         Engine.Tick();
+
+        // 현재는 Frame Pacing을 구현하지 않았으므로 무제한 busy loop만 방지한다.
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
 

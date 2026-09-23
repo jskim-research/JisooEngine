@@ -26,6 +26,7 @@ bool FD3D12CommandContext::Initialize(
     QueueDescription.Priority = D3D12_COMMAND_QUEUE_PRIORITY_NORMAL;
     QueueDescription.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
 
+    // CreateCommandList는 열린 상태를 반환하므로 첫 BeginFrame에서 Reset할 수 있게 즉시 닫아 둔다.
     if (FAILED(Device->CreateCommandQueue(
             &QueueDescription,
             IID_PPV_ARGS(&CommandQueue))) ||
@@ -71,6 +72,7 @@ void FD3D12CommandContext::Shutdown()
 
 bool FD3D12CommandContext::BeginFrame(FFrameResource& FrameResource)
 {
+    // GPU가 이전 명령을 참조하는 동안 같은 Frame Slot의 Allocator를 Reset하면 안 된다.
     if (!WaitForFence(FrameResource.GetFenceValue()))
     {
         return false;

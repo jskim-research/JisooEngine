@@ -9,6 +9,12 @@ file(GLOB_RECURSE JISOO_ENGINE_RUNTIME_SOURCES
 add_library(JisooEngineRuntime STATIC ${JISOO_ENGINE_RUNTIME_SOURCES})
 add_library(JisooEngine::Runtime ALIAS JisooEngineRuntime)
 
+target_link_libraries(JisooEngineRuntime
+    PRIVATE
+        d3d12
+        dxgi
+)
+
 target_include_directories(JisooEngineRuntime
     PUBLIC
         "${CMAKE_CURRENT_SOURCE_DIR}/Source"

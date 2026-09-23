@@ -8,14 +8,23 @@
 
 int FEngineLoop::Run(FEngine& Engine)
 {
+    constexpr std::uint32_t ClientWidth = 1280;
+    constexpr std::uint32_t ClientHeight = 720;
+
     FWindowsWindow Window;
-    if (!Window.Initialize(L"JisooEngine", 1280, 720))
+    if (!Window.Initialize(L"JisooEngine", ClientWidth, ClientHeight))
     {
         return -1;
     }
 
-    if (!Engine.Initialize())
+    FEngineInitParams InitParams{};
+    InitParams.NativeWindowHandle = Window.GetNativeHandle();
+    InitParams.ClientWidth = ClientWidth;
+    InitParams.ClientHeight = ClientHeight;
+
+    if (!Engine.Initialize(InitParams))
     {
+        Engine.Shutdown();
         return -1;
     }
 

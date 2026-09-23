@@ -88,6 +88,40 @@ JisooGameEditor.exe
 
 현재 의존 규칙은 구현·리뷰에서 확인한다. 소스 폴더 분리만으로 잘못된 include가 컴파일 단계에서 자동 차단되는 것은 아니다.
 
+## Game Scene과 Render Scene 경계
+
+Game Scene과 Render Scene은 별도의 표현과 생애주기를 가진다. `UWorld`와 Actor가 `UPrimitiveComponent`를 소유하고, `FScene`은 Renderer가 소비하는 `FPrimitiveSceneProxy`를 소유한다.
+
+```text
+Game Scene                                  Render Scene
+UWorld                                      FScene
+└─ Actor                                    └─ FPrimitiveSceneProxy
+   └─ UPrimitiveComponent                       ├─ Transform·Bounds
+        ├─ 렌더 의도와 에셋 설정                 ├─ Geometry·Material render reference
+        └─ FPrimitiveSceneHandle                 └─ Visibility·render flags
+               │
+               ├─ Add(Description) ──────────────>
+               ├─ Update(Handle, Values) ────────>
+               └─ Remove(Handle) ────────────────>
+```
+
+다음 규칙을 유지한다.
+
+- `FPrimitiveSceneProxy`는 자신을 생성한 `UPrimitiveComponent` 포인터나 다른 Game Scene 객체 포인터를 저장하지 않는다.
+- Renderer는 `UPrimitiveComponent`, Actor와 `UWorld`를 역참조하지 않고 `FScene`이 소유한 Render Scene 표현만 읽는다.
+- `UPrimitiveComponent`는 Transform, Bounds, Geometry·Material 설정, Visibility와 Cast Shadow 같은 렌더 의도를 소유한다.
+- Render Pass 선택, PSO와 Descriptor 구성, Draw 순서, D3D12 Command 기록과 제출은 Renderer 책임이며 Component에 넣지 않는다.
+- Component 등록 시 값 형태의 Scene description을 전달하고 안정적인 scene handle을 받는다. 이후 변경과 제거는 이 handle과 값 기반 갱신을 사용한다.
+- 초기 구현은 Single Thread이므로 Add·Update·Remove를 동기적으로 적용한다. Render Thread와 비동기 update command queue는 필요해질 때 별도로 결정한다.
+- Culling은 Proxy를 `FScene`에서 등록 해제하지 않는다. 등록된 Proxy에서 View별·프레임별 Visible 목록을 별도로 만든다.
+- GPU resource의 실제 수명은 Component나 SceneProxy 포인터 수명에 기대지 않고 Renderer의 resource 관리와 Fence 완료 시점으로 관리한다.
+
+SceneProxy는 원본 Component 접근을 한 단계 감싸는 전달 객체나 성능 캐시로 정의하지 않는다. 책임 경계를 위해 독립된 Render Scene 상태를 보유하며, Component 상태를 다시 읽어야 하는 경우에는 명시적인 값 갱신을 추가한다. 이전 자체엔진처럼 Proxy가 Component 포인터를 보관하고 렌더 경로에서 역참조하는 혼합형은 사용하지 않는다.
+
+SceneProxy를 타입별 계층으로 구성할지 공통 데이터 표현으로 먼저 구현할지, scene description과 update payload를 어떤 단위로 나눌지, Geometry·Material render reference를 어떤 handle로 표현할지는 관련 타입을 구현할 때 확정한다. MeshBatch, PassProcessor, Render Graph와 RHI는 이 결정의 적용 범위가 아니다.
+
+선택 이유와 검토한 대안은 [Game Scene과 Render Scene 책임 분리 결정](decisions/Game%20Scene과%20Render%20Scene%20책임%20분리%20결정.md)에 기록한다.
+
 ## 코드 배치 기준
 
 | 코드의 역할 | 배치할 위치 |
@@ -132,4 +166,8 @@ JisooGame.exe       -> main.cpp -> FEngineLoop.Run(FGameEngine)
 JisooGameEditor.exe -> main.cpp -> FEngineLoop.Run(FEditorEngine)
 ```
 
-현재 `FEngineLoop`는 최소 Win32 창을 생성하고 메시지를 처리하며, 창을 닫을 때까지 `FEngine::Tick`을 반복 호출한 뒤 종료한다. `FWindowsWindow`는 창과 네이티브 핸들을 소유하지만 범용 Application 계층은 두지 않는다. 렌더러, 에디터 화면, 편집·플레이 월드 전환, 게임 콘텐츠 로딩·패키징은 아직 구현되지 않았다.
+현재 `FEngineLoop`는 최소 Win32 창을 생성하고 메시지를 처리하며, 창을 닫을 때까지 `FEngine::Tick`을 반복 호출한 뒤 종료한다. `FWindowsWindow`는 창과 네이티브 핸들을 소유하지만 범용 Application 계층은 두지 않는다.
+
+`FEngine`은 D3D12 전용 `FRenderer`를 소유하고 초기화·프레임 렌더링·종료 수명을 관리한다. `FRenderer`는 RHI나 그래픽 API 다형성 계층 없이 `FD3D12Device`, `FD3D12CommandContext`, `FDXGISwapChain`과 프레임별 `FFrameResource`를 합성한다. 현재 렌더링 범위는 BackBuffer 상태 전환, Clear, Present와 Fence 기반 프레임 자원 재사용까지이며, Scene 렌더링과 Render Pipeline은 아직 연결하지 않는다.
+
+에디터 화면, 편집·플레이 월드 전환, 게임 콘텐츠 로딩·패키징은 아직 구현되지 않았다.

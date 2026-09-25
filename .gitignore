@@ -19,3 +19,6 @@
 # AI-Generated Files
 docs/learning
 docs/decisions
+
+# Local portfolio worklogs
+/.portfolio/

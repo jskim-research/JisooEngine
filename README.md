@@ -51,3 +51,4 @@ Visual Studio 기본 시작 프로젝트는 `JisooGameEditor`입니다. `JisooGa
 - [엔진 아키텍처](docs/architecture.md)
 - [좌표계와 변환 규칙](docs/conventions/coordinate-system.md)
 - [개발 계획](docs/development-plan.md)
+- [임시 구현 및 재검토 목록](docs/implementation-revisit-list.md)

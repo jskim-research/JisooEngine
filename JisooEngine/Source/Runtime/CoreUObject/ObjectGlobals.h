@@ -30,6 +30,8 @@ void FlushPendingDestroyObjects();
 
 [[nodiscard]] bool IsValid(const UObject* Object);
 [[nodiscard]] bool IsValid(FObjectHandle Handle);
+/** 생애주기 상태와 무관하게 Handle의 객체 슬롯이 아직 할당되어 있는지 확인한다. */
+[[nodiscard]] bool IsObjectAllocated(FObjectHandle Handle);
 [[nodiscard]] UObject* ResolveObject(FObjectHandle Handle);
 
 template<typename TObject>

@@ -93,40 +93,50 @@ void DestroyObject(UObject* Object)
 
 void FlushPendingDestroyObjects()
 {
-    std::vector<FObjectHandle> RemainingObjects;
-    RemainingObjects.reserve(GPendingDestroyObjects.size());
-
-    for (const FObjectHandle Handle : GPendingDestroyObjects)
+    while (!GPendingDestroyObjects.empty())
     {
-        UObject* Object = GUObjectArray.Resolve(Handle);
-        if (Object == nullptr)
+        std::vector<FObjectHandle> CurrentBatch;
+        CurrentBatch.swap(GPendingDestroyObjects);
+        std::size_t DestroyedObjectCount = 0;
+
+        for (const FObjectHandle Handle : CurrentBatch)
         {
-            continue;
+            UObject* Object = GUObjectArray.Resolve(Handle);
+            if (Object == nullptr)
+            {
+                continue;
+            }
+
+            if (Object->GetState() == EObjectState::PendingDestroy)
+            {
+                Object->BeginDestroy();
+                Object->SetState(EObjectState::BeginDestroyed);
+            }
+
+            if (!Object->IsReadyForFinishDestroy())
+            {
+                GPendingDestroyObjects.push_back(Handle);
+                continue;
+            }
+
+            Object->FinishDestroy();
+            Object->SetState(EObjectState::FinishDestroyed);
+
+            UClass* Class = Object->GetClass();
+            assert(Class != nullptr);
+            Class->Destroy(Object);
+            GUObjectArray.FreeObjectIndex(Handle, Object);
+            FreeObjectMemory(Object, *Class);
+            ++DestroyedObjectCount;
         }
 
-        if (Object->GetState() == EObjectState::PendingDestroy)
+        // 비동기 정리를 기다리는 객체만 남았다면 다음 프레임의 Flush에서 다시 확인한다.
+        if (DestroyedObjectCount == 0
+            && GPendingDestroyObjects.size() == CurrentBatch.size())
         {
-            Object->BeginDestroy();
-            Object->SetState(EObjectState::BeginDestroyed);
+            break;
         }
-
-        if (!Object->IsReadyForFinishDestroy())
-        {
-            RemainingObjects.push_back(Handle);
-            continue;
-        }
-
-        Object->FinishDestroy();
-        Object->SetState(EObjectState::FinishDestroyed);
-
-        UClass* Class = Object->GetClass();
-        assert(Class != nullptr);
-        Class->Destroy(Object);
-        GUObjectArray.FreeObjectIndex(Handle, Object);
-        FreeObjectMemory(Object, *Class);
     }
-
-    GPendingDestroyObjects = std::move(RemainingObjects);
 }
 
 bool IsValid(const UObject* Object)
@@ -139,6 +149,11 @@ bool IsValid(const UObject* Object)
 bool IsValid(FObjectHandle Handle)
 {
     return GUObjectArray.IsValid(Handle);
+}
+
+bool IsObjectAllocated(FObjectHandle Handle)
+{
+    return GUObjectArray.Resolve(Handle) != nullptr;
 }
 
 UObject* ResolveObject(FObjectHandle Handle)

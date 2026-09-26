@@ -105,11 +105,32 @@ UClass ── 타입 이름·부모·크기·생성 및 소멸 함수
 - UObject는 `NewObject`로만 생성하며, 생성 전에 `GUObjectArray` 슬롯과 생성 문맥을 확보한다.
 - 리플렉션 UObject는 `const FObjectInitializer&` 생성자만 사용하며, 생성 코드가 이를 명시적으로 전달한다.
 - `DestroyObject`는 파괴 대기 상태만 설정하고 `FlushPendingDestroyObjects`가 `BeginDestroy`, `FinishDestroy`, 실제 소멸과 슬롯 반환을 순서대로 수행한다.
+- Flush는 현재 대기 목록을 별도 batch로 분리해 처리한다. `BeginDestroy` 중 추가된 파괴 요청은 다음 batch에 보존하며, 자식 객체가 남은 World·Actor는 `IsReadyForFinishDestroy`에서 부모의 실제 해제를 지연한다.
 - `FObjectHandle`은 `Index + Serial`로 슬롯 재사용 뒤 오래된 참조가 새 객체를 가리키지 않게 한다.
 - `Outer`는 이름 경로와 논리적 소속만 나타내며 소유권이나 생존 참조를 만들지 않는다.
 - `UCLASS`와 `GENERATED_BODY`의 타입 선언 및 생성 함수는 `Scripts/GenerateHeaders.py`가 `Intermediate/Generated`에 만든다.
 
 현재 생성기는 최상위 단일 상속 `UCLASS`만 지원한다. 중첩·네임스페이스·템플릿·조건부 선언과 다중 상속은 생성 단계에서 거부한다. Property Reflection, GC, CDO, 직렬화, Package·Asset과 이름 기반 Class Registry는 이후 범위다.
+
+## Game Scene 컨테이너와 생명주기
+
+Game Scene의 현재 컨테이너 관계는 다음과 같다.
+
+```text
+FEngine
+└─ UWorld Handle 목록
+   └─ AActor Handle 목록
+      └─ UActorComponent Handle 목록
+         └─ USceneComponent 부착 계층
+            └─ UPrimitiveComponent
+```
+
+- 컨테이너는 `FObjectHandle`을 보관하고 실제 할당과 해제는 CoreUObject가 담당한다. `Outer`는 World·Actor·Component의 논리적 소속과 이름 경로를 표현하지만 메모리 소유권으로 사용하지 않는다.
+- World와 Actor는 Tick 시작 시점의 Handle 목록을 복사해 순회한다. Tick 중 생성된 객체는 다음 프레임부터 참여하고, 파괴 요청된 객체는 Handle 해석에 실패하므로 남은 순회에서 제외된다.
+- World가 시작된 뒤 생성된 Actor와 Actor가 시작된 뒤 추가된 Component는 즉시 BeginPlay한다. EndPlay와 Unregister는 실제 객체 메모리 해제 전에 수행한다.
+- 상위 컨테이너를 파괴할 때 Component, Actor, World 순서로 실제 해제한다. 직접 `DestroyObject`가 호출된 경우에도 부모는 자식 Handle의 슬롯이 반환될 때까지 FinishDestroy를 기다린다.
+- `USceneComponent`는 같은 Actor 안에서만 부모·자식 관계를 만들며 `ComponentToWorld = Local * ParentWorld` 규칙을 사용한다. 회전은 Euler 합성 순서가 확정되기 전까지 `FQuat` 값으로 보관한다.
+- `UPrimitiveComponent`는 Visibility, Cast Shadow, Local/World Bounds만 제공한다. `FScene`, SceneProxy, Geometry·Material과 Physics 연결은 아직 포함하지 않는다.
 
 ## Game Scene과 Render Scene 경계
 
@@ -189,8 +210,8 @@ JisooGame.exe       -> main.cpp -> FEngineLoop.Run(FGameEngine)
 JisooGameEditor.exe -> main.cpp -> FEngineLoop.Run(FEditorEngine)
 ```
 
-현재 `FEngineLoop`는 최소 Win32 창을 생성하고 메시지를 처리하며, 창을 닫을 때까지 `FEngine::Tick`을 반복 호출한 뒤 종료한다. `FWindowsWindow`는 창과 네이티브 핸들을 소유하지만 범용 Application 계층은 두지 않는다.
+현재 `FEngineLoop`는 최소 Win32 창을 생성하고 메시지를 처리하며 `steady_clock`으로 DeltaSeconds를 계산해, 창을 닫을 때까지 `FEngine::Tick`을 반복 호출한 뒤 종료한다. `FWindowsWindow`는 창과 네이티브 핸들을 소유하지만 범용 Application 계층은 두지 않는다.
 
-`FEngine`은 D3D12 전용 `FRenderer`를 소유하고 초기화·프레임 렌더링·종료 수명을 관리한다. `FRenderer`는 RHI나 그래픽 API 다형성 계층 없이 `FD3D12Device`, `FD3D12CommandContext`, `FDXGISwapChain`과 프레임별 `FFrameResource`를 합성한다. 현재 렌더링 범위는 BackBuffer 상태 전환, Clear, Present와 Fence 기반 프레임 자원 재사용까지이며, Scene 렌더링과 Render Pipeline은 아직 연결하지 않는다.
+`FEngine`은 World Handle 목록과 D3D12 전용 `FRenderer`를 소유한다. 한 프레임은 World Tick → Renderer Frame → Pending UObject Flush 순서로 처리한다. 종료할 때는 World 파괴와 Pending UObject Flush를 먼저 수행한 뒤 Renderer를 종료한다. `FRenderer`는 RHI나 그래픽 API 다형성 계층 없이 `FD3D12Device`, `FD3D12CommandContext`, `FDXGISwapChain`과 프레임별 `FFrameResource`를 합성한다. 현재 렌더링 범위는 BackBuffer 상태 전환, Clear, Present와 Fence 기반 프레임 자원 재사용까지이며, Scene 렌더링과 Render Pipeline은 아직 연결하지 않는다.
 
 에디터 화면, 편집·플레이 월드 전환, 게임 콘텐츠 로딩·패키징은 아직 구현되지 않았다.

@@ -15,6 +15,7 @@ Repository/
 │  ├─ Source/
 │  │  ├─ main.cpp             # 두 실행 타깃이 각각 컴파일하는 공통 진입점
 │  │  ├─ Runtime/
+│  │  │  ├─ CoreUObject/      # UObject 타입 정보, 생성·파괴와 전역 객체 추적
 │  │  │  ├─ Launch/           # FEngineLoop
 │  │  │  ├─ Platform/Windows/ # 최소 Win32 창과 메시지 처리
 │  │  │  └─ Engine/           # FEngine, FGameEngine
@@ -87,6 +88,28 @@ JisooGameEditor.exe
 - 게임 타입 등록과 초기화 연결은 실제 게임 기능을 구현할 때 추가한다. 라이브러리를 링크하는 것만으로 게임 코드가 자동 실행된다고 가정하지 않는다.
 
 현재 의존 규칙은 구현·리뷰에서 확인한다. 소스 폴더 분리만으로 잘못된 include가 컴파일 단계에서 자동 차단되는 것은 아니다.
+
+## CoreUObject 객체 시스템
+
+`Runtime/CoreUObject`는 World·Actor·Component와 Asset이 공통으로 사용할 객체 정체성과 생애주기 기반을 제공한다.
+
+```text
+UClass ── 타입 이름·부모·크기·생성 및 소멸 함수
+  │
+  └─ UObject ── Class·Name·Outer·Handle·생애주기 상태
+         │
+         └─ GUObjectArray ── 객체 주소·Index·Serial
+```
+
+- `UClass`는 초기 구현에서 `UObject`를 상속하지 않는 프로세스 수명의 타입 설명자다.
+- UObject는 `NewObject`로만 생성하며, 생성 전에 `GUObjectArray` 슬롯과 생성 문맥을 확보한다.
+- 리플렉션 UObject는 `const FObjectInitializer&` 생성자만 사용하며, 생성 코드가 이를 명시적으로 전달한다.
+- `DestroyObject`는 파괴 대기 상태만 설정하고 `FlushPendingDestroyObjects`가 `BeginDestroy`, `FinishDestroy`, 실제 소멸과 슬롯 반환을 순서대로 수행한다.
+- `FObjectHandle`은 `Index + Serial`로 슬롯 재사용 뒤 오래된 참조가 새 객체를 가리키지 않게 한다.
+- `Outer`는 이름 경로와 논리적 소속만 나타내며 소유권이나 생존 참조를 만들지 않는다.
+- `UCLASS`와 `GENERATED_BODY`의 타입 선언 및 생성 함수는 `Scripts/GenerateHeaders.py`가 `Intermediate/Generated`에 만든다.
+
+현재 생성기는 최상위 단일 상속 `UCLASS`만 지원한다. 중첩·네임스페이스·템플릿·조건부 선언과 다중 상속은 생성 단계에서 거부한다. Property Reflection, GC, CDO, 직렬화, Package·Asset과 이름 기반 Class Registry는 이후 범위다.
 
 ## Game Scene과 Render Scene 경계
 

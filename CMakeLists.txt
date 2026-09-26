@@ -19,6 +19,8 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 set_property(GLOBAL PROPERTY PREDEFINED_TARGETS_FOLDER "CMake")
 
+include(CTest)
+
 function(jisoo_configure_target TARGET_NAME PRODUCT_ROOT)
     target_compile_features(${TARGET_NAME} PUBLIC cxx_std_20)
 

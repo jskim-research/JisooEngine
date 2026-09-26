@@ -12,6 +12,7 @@ DirectX 12와 C++20으로 개발하는 Windows용 3D 게임 엔진입니다.
 - Visual Studio의 **Desktop development with C++** 워크로드
 - Windows SDK
 - CMake 3.24 이상
+- Python 3.10 이상
 
 ## 개발 명령
 
@@ -41,6 +42,7 @@ Visual Studio 기본 시작 프로젝트는 `JisooGameEditor`입니다. `JisooGa
 | Game 실행 파일 | `JisooGame/Binaries/Win64/<구성>/JisooGame.exe` |
 | 실행 파일 PDB | 각 실행 파일과 같은 디렉터리 |
 | 제품별 컴파일 중간 파일 | `JisooEngine/Intermediate`, `JisooGame/Intermediate` |
+| UObject 생성 코드 | `JisooEngine/Intermediate/Generated` |
 
 경로의 `<구성>`에는 `Debug` 또는 `Release`가 들어갑니다.
 

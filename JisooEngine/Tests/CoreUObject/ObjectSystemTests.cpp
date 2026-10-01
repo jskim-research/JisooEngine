@@ -7,6 +7,8 @@
 #include "Runtime/Engine/Components/SceneComponent.h"
 #include "Runtime/Engine/Engine.h"
 #include "Runtime/Engine/World.h"
+#include "Runtime/Render/Scene/PrimitiveSceneProxy.h"
+#include "Runtime/Render/Scene/Scene.h"
 
 #include <cmath>
 #include <iostream>
@@ -98,11 +100,30 @@ int main()
         USceneComponent* RootComponent = Actor->AddComponent<USceneComponent>("Root");
         UPrimitiveComponent* PrimitiveComponent = Actor->AddComponent<UPrimitiveComponent>("Primitive");
 
+        const FPrimitiveSceneHandle PrimitiveSceneHandle =
+            PrimitiveComponent->GetPrimitiveSceneHandle();
+        const FPrimitiveSceneProxy* PrimitiveSceneProxy =
+            World->GetScene()->ResolvePrimitive(PrimitiveSceneHandle);
+
         Expect(Actor->GetWorld() == World, "actor resolves owning world");
         Expect(TickComponent->GetOwner() == Actor, "component resolves owning actor");
         Expect(TickComponent->GetWorld() == World, "component resolves owning world");
         Expect(TickComponent->IsRegistered(), "component registers with actor");
         Expect(Actor->GetRootComponent() == RootComponent, "first scene component becomes root");
+        Expect(PrimitiveSceneHandle.IsSet(), "primitive stores scene handle after registration");
+        Expect(PrimitiveSceneProxy != nullptr, "scene handle resolves registered proxy");
+        Expect(World->GetScene()->GetPrimitiveCount() == 1, "world scene owns registered proxy");
+        std::size_t VisitedSceneProxyCount = 0;
+        const FPrimitiveSceneProxy* VisitedSceneProxy = nullptr;
+        World->GetScene()->ForEachPrimitive(
+            [&VisitedSceneProxyCount, &VisitedSceneProxy](const FPrimitiveSceneProxy& Proxy)
+            {
+                ++VisitedSceneProxyCount;
+                VisitedSceneProxy = &Proxy;
+            });
+        Expect(
+            VisitedSceneProxyCount == 1 && VisitedSceneProxy == PrimitiveSceneProxy,
+            "scene exposes read-only proxies to renderer consumers");
         Expect(UTestActor::GetBeginPlayCount() == 1, "spawned actor begins play in active world");
         Expect(UTestActorComponent::GetBeginPlayCount() == 1, "component added during play begins play");
 
@@ -112,6 +133,8 @@ int main()
         PrimitiveComponent->SetCastShadow(false);
         Expect(!PrimitiveComponent->IsVisible(), "primitive stores visibility intent");
         Expect(!PrimitiveComponent->CastsShadow(), "primitive stores shadow intent");
+        Expect(!PrimitiveSceneProxy->IsVisible(), "scene proxy receives visibility update");
+        Expect(!PrimitiveSceneProxy->CastsShadow(), "scene proxy receives shadow update");
 
         FTransform RootTransform;
         RootTransform.Translation = FVector{10.0f, 0.0f, 0.0f};
@@ -127,6 +150,35 @@ int main()
         const FBox& WorldBounds = PrimitiveComponent->GetWorldBounds();
         Expect(NearlyEqual(WorldBounds.Min.X, 14.0f), "primitive world bounds minimum follows transform");
         Expect(NearlyEqual(WorldBounds.Max.X, 16.0f), "primitive world bounds maximum follows transform");
+        Expect(
+            NearlyEqual(PrimitiveSceneProxy->GetLocalToWorld().M[3][0], 15.0f),
+            "scene proxy receives composed world transform");
+        Expect(
+            NearlyEqual(PrimitiveSceneProxy->GetWorldBounds().Min.X, 14.0f),
+            "scene proxy receives world bounds minimum");
+        Expect(
+            NearlyEqual(PrimitiveSceneProxy->GetWorldBounds().Max.X, 16.0f),
+            "scene proxy receives world bounds maximum");
+
+        Expect(Actor->DestroyComponent(PrimitiveComponent), "primitive unregisters from scene");
+        Expect(
+            World->GetScene()->ResolvePrimitive(PrimitiveSceneHandle) == nullptr,
+            "removed primitive scene handle becomes stale");
+        Expect(World->GetScene()->GetPrimitiveCount() == 0, "scene releases removed proxy");
+
+        UPrimitiveComponent* ReplacementPrimitive =
+            Actor->AddComponent<UPrimitiveComponent>("ReplacementPrimitive");
+        const FPrimitiveSceneHandle ReplacementSceneHandle =
+            ReplacementPrimitive->GetPrimitiveSceneHandle();
+        Expect(
+            ReplacementSceneHandle.Index == PrimitiveSceneHandle.Index,
+            "scene reuses freed primitive slot");
+        Expect(
+            ReplacementSceneHandle.Generation != PrimitiveSceneHandle.Generation,
+            "reused primitive slot receives a new generation");
+        Expect(
+            World->GetScene()->ResolvePrimitive(PrimitiveSceneHandle) == nullptr,
+            "stale scene handle cannot resolve replacement proxy");
 
         Engine.Tick(0.25f);
         Expect(UTestActor::GetTickCount() == 1, "engine ticks world actor");
@@ -160,6 +212,7 @@ int main()
         Expect(!IsObjectAllocated(DestroyedActorHandle), "engine tick flushes destroyed actor");
         Expect(!IsObjectAllocated(DestroyedComponentHandle), "actor destruction flushes owned component");
         Expect(World->GetActors().size() == 1, "destroyed actor leaves world container immediately");
+        Expect(World->GetScene()->GetPrimitiveCount() == 0, "actor destruction removes scene proxy");
 
         Engine.DestroyWorld(World);
         Engine.Tick(0.0f);
@@ -175,6 +228,22 @@ int main()
     Expect(
         GUObjectArray.GetObjectCount() == 0,
         "flush preserves destroy requests queued by BeginDestroy and drains hierarchy");
+
+    UWorld* DirectActorWorld = NewObject<UWorld>(nullptr, "DirectActorWorld");
+    AActor* DirectActor = DirectActorWorld->SpawnActor<AActor>("DirectActor");
+    [[maybe_unused]] UPrimitiveComponent* DirectPrimitive =
+        DirectActor->AddComponent<UPrimitiveComponent>("DirectPrimitive");
+    Expect(
+        DirectActorWorld->GetScene()->GetPrimitiveCount() == 1,
+        "direct actor test registers primitive proxy");
+    DestroyObject(DirectActor);
+    FlushPendingDestroyObjects();
+    Expect(
+        DirectActorWorld->GetScene()->GetPrimitiveCount() == 0,
+        "direct actor destruction unregisters primitive proxy");
+    DestroyObject(DirectActorWorld);
+    FlushPendingDestroyObjects();
+    Expect(GUObjectArray.GetObjectCount() == 0, "direct actor test releases world hierarchy");
 
     if (FailureCount != 0)
     {

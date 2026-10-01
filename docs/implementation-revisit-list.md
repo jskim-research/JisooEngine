@@ -40,12 +40,12 @@
 
 ## Component와 Game Scene
 
-- [ ] Component 등록을 현재 bool 상태에서 World 시스템 등록 과정으로 확장한다.
-  - FScene, Physics, Navigation 등이 생기면 OnRegister·OnUnregister 순서와 실패 처리를 확정한다.
+- [x] PrimitiveComponent 등록·해제를 FScene의 Proxy 등록·제거와 연결한다.
+- [ ] Physics와 Navigation을 Component 등록 과정에 연결할 때 OnRegister·OnUnregister 순서와 실패 처리를 확정한다.
 - [ ] SceneComponent 부착 규칙에 KeepRelative·KeepWorld, Socket과 절대 Transform 옵션을 추가할 시점을 결정한다.
 - [ ] 최소 Math 타입의 Quaternion 연산, 역행렬, SIMD와 수치 오차 정책을 확정한다.
 - [ ] Euler 회전 합성 순서를 확정한 뒤 외부 Rotator API를 추가한다.
-- [ ] PrimitiveComponent의 Visibility·Cast Shadow·Bounds를 FScene의 값 기반 Add·Update·Remove와 연결한다.
+- [x] PrimitiveComponent의 Transform·Bounds·Visibility·Cast Shadow를 FScene의 값 기반 Add·Update·Remove와 연결한다.
 - [ ] Collision·Physics State는 FScene 연결과 분리된 Component 등록 단계로 설계한다.
 
 ## Object Reflection과 데이터
@@ -58,7 +58,8 @@
 
 ## Render Scene 이후
 
-- [ ] `FScene`, `FPrimitiveSceneProxy`와 안정적인 Scene Handle 표현을 확정한다.
-- [ ] Component와 SceneProxy 사이의 description·update payload 단위를 확정한다.
+- [x] `FScene`, 최소 `FPrimitiveSceneProxy`와 `Index + Generation` Scene Handle을 구현한다.
+- [x] Component와 SceneProxy 사이의 최초 description과 Transform·Bounds·Flags update payload를 분리한다.
+- [ ] Primitive 수와 갱신량이 커지면 선형 슬롯 순회, 단건 동기 update를 SceneInfo·공간 인덱스·batch update로 확장한다.
 - [ ] Geometry·Material render reference와 Renderer 자원 수명·Fence 연동을 구현한다.
 - [ ] Render Thread와 비동기 update command queue는 Single Thread 구조가 실제 병목이 된 뒤 검토한다.

@@ -7,10 +7,12 @@
 #include <type_traits>
 #include <utility>
 #include <vector>
+#include <memory>
 
 #include "Runtime/Engine/World.generated.h"
 
 class AActor;
+class FScene;
 
 UCLASS()
 /**
@@ -36,6 +38,8 @@ public:
     bool DestroyActor(AActor* Actor);
 
     [[nodiscard]] std::vector<AActor*> GetActors() const;
+    [[nodiscard]] FScene* GetScene();
+    [[nodiscard]] const FScene* GetScene() const;
     [[nodiscard]] bool HasBegunPlay() const;
 
     void BeginPlay();
@@ -55,6 +59,7 @@ private:
 
     std::vector<FObjectHandle> Actors;
     std::vector<FObjectHandle> DestroyingActors;
+    std::unique_ptr<FScene> Scene;
     bool bHasBegunPlay = false;
     bool bWorldDestroyRouted = false;
 };

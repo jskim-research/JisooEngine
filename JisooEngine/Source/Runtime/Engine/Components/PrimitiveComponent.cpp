@@ -1,5 +1,12 @@
 #include "Runtime/Engine/Components/PrimitiveComponent.h"
 
+#include "Runtime/Engine/Actor.h"
+#include "Runtime/Engine/World.h"
+#include "Runtime/Render/Scene/PrimitiveSceneProxy.h"
+#include "Runtime/Render/Scene/Scene.h"
+
+#include <memory>
+
 UPrimitiveComponent::UPrimitiveComponent(const FObjectInitializer& ObjectInitializer)
     : Super(ObjectInitializer)
 {
@@ -14,7 +21,13 @@ bool UPrimitiveComponent::IsVisible() const
 
 void UPrimitiveComponent::SetVisibility(bool bInVisible)
 {
+    if (bVisible == bInVisible)
+    {
+        return;
+    }
+
     bVisible = bInVisible;
+    SendRenderFlags();
 }
 
 bool UPrimitiveComponent::CastsShadow() const
@@ -24,7 +37,13 @@ bool UPrimitiveComponent::CastsShadow() const
 
 void UPrimitiveComponent::SetCastShadow(bool bInCastShadow)
 {
+    if (bCastShadow == bInCastShadow)
+    {
+        return;
+    }
+
     bCastShadow = bInCastShadow;
+    SendRenderFlags();
 }
 
 const FBox& UPrimitiveComponent::GetLocalBounds() const
@@ -36,6 +55,7 @@ void UPrimitiveComponent::SetLocalBounds(const FBox& InBounds)
 {
     LocalBounds = InBounds;
     MarkBoundsDirty();
+    SendRenderBounds();
 }
 
 const FBox& UPrimitiveComponent::GetWorldBounds() const
@@ -48,13 +68,123 @@ const FBox& UPrimitiveComponent::GetWorldBounds() const
     return WorldBounds;
 }
 
+FPrimitiveSceneHandle UPrimitiveComponent::GetPrimitiveSceneHandle() const
+{
+    return PrimitiveSceneHandle;
+}
+
+std::unique_ptr<FPrimitiveSceneProxy> UPrimitiveComponent::CreateSceneProxy() const
+{
+    return std::make_unique<FPrimitiveSceneProxy>(BuildSceneDescription());
+}
+
+FPrimitiveSceneDescription UPrimitiveComponent::BuildSceneDescription() const
+{
+    return {
+        GetComponentToWorld(),
+        GetLocalBounds(),
+        GetWorldBounds(),
+        IsVisible(),
+        CastsShadow()};
+}
+
+void UPrimitiveComponent::OnRegister()
+{
+    Super::OnRegister();
+
+    UWorld* World = GetWorld();
+    FScene* Scene = World != nullptr ? World->GetScene() : nullptr;
+    if (Scene == nullptr || PrimitiveSceneHandle.IsSet())
+    {
+        return;
+    }
+
+    std::unique_ptr<FPrimitiveSceneProxy> Proxy = CreateSceneProxy();
+    if (Proxy != nullptr)
+    {
+        PrimitiveSceneHandle = Scene->AddPrimitive(std::move(Proxy));
+    }
+}
+
+void UPrimitiveComponent::OnUnregister()
+{
+    if (PrimitiveSceneHandle.IsSet())
+    {
+        // Actor의 직접 파괴 중에는 public Owner 해석이 실패하므로 정리 경로에서만 Outer를 사용한다.
+        AActor* OwnerEvenIfPendingDestroy = Cast<AActor>(GetOuter());
+        UWorld* World = OwnerEvenIfPendingDestroy != nullptr
+            ? OwnerEvenIfPendingDestroy->GetWorld()
+            : nullptr;
+        FScene* Scene = World != nullptr ? World->GetScene() : nullptr;
+        if (Scene != nullptr)
+        {
+            Scene->RemovePrimitive(PrimitiveSceneHandle);
+        }
+        PrimitiveSceneHandle = {};
+    }
+
+    Super::OnUnregister();
+}
+
 void UPrimitiveComponent::OnTransformChanged()
 {
     Super::OnTransformChanged();
     MarkBoundsDirty();
+    SendRenderTransform();
 }
 
 void UPrimitiveComponent::MarkBoundsDirty()
 {
     bWorldBoundsDirty = true;
+}
+
+void UPrimitiveComponent::SendRenderTransform()
+{
+    if (!PrimitiveSceneHandle.IsSet())
+    {
+        return;
+    }
+
+    UWorld* World = GetWorld();
+    FScene* Scene = World != nullptr ? World->GetScene() : nullptr;
+    if (Scene != nullptr)
+    {
+        Scene->UpdatePrimitiveTransform(
+            PrimitiveSceneHandle,
+            {GetComponentToWorld(), GetWorldBounds()});
+    }
+}
+
+void UPrimitiveComponent::SendRenderBounds()
+{
+    if (!PrimitiveSceneHandle.IsSet())
+    {
+        return;
+    }
+
+    UWorld* World = GetWorld();
+    FScene* Scene = World != nullptr ? World->GetScene() : nullptr;
+    if (Scene != nullptr)
+    {
+        Scene->UpdatePrimitiveBounds(
+            PrimitiveSceneHandle,
+            {GetLocalBounds(), GetWorldBounds()});
+    }
+}
+
+void UPrimitiveComponent::SendRenderFlags()
+{
+    if (!PrimitiveSceneHandle.IsSet())
+    {
+        return;
+    }
+
+    UWorld* World = GetWorld();
+    FScene* Scene = World != nullptr ? World->GetScene() : nullptr;
+    if (Scene != nullptr)
+    {
+        Scene->UpdatePrimitiveFlags(
+            PrimitiveSceneHandle,
+            {IsVisible(), CastsShadow()});
+    }
 }

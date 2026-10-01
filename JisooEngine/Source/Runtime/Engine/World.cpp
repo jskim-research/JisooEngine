@@ -1,11 +1,13 @@
 #include "Runtime/Engine/World.h"
 
 #include "Runtime/Engine/Actor.h"
+#include "Runtime/Render/Scene/Scene.h"
 
 #include <algorithm>
 
 UWorld::UWorld(const FObjectInitializer& ObjectInitializer)
     : Super(ObjectInitializer)
+    , Scene(std::make_unique<FScene>())
 {
 }
 
@@ -44,6 +46,16 @@ std::vector<AActor*> UWorld::GetActors() const
         }
     }
     return Result;
+}
+
+FScene* UWorld::GetScene()
+{
+    return Scene.get();
+}
+
+const FScene* UWorld::GetScene() const
+{
+    return Scene.get();
 }
 
 bool UWorld::HasBegunPlay() const

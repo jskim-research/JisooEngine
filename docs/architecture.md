@@ -18,7 +18,8 @@ Repository/
 │  │  │  ├─ CoreUObject/      # UObject 타입 정보, 생성·파괴와 전역 객체 추적
 │  │  │  ├─ Launch/           # FEngineLoop
 │  │  │  ├─ Platform/Windows/ # 최소 Win32 창과 메시지 처리
-│  │  │  └─ Engine/           # FEngine, FGameEngine
+│  │  │  ├─ Engine/           # FEngine, FGameEngine와 Game Scene
+│  │  │  └─ Render/           # Render Scene과 D3D12 Renderer
 │  │  └─ Editor/
 │  │     └─ Engine/           # FEditorEngine
 │  ├─ Content/
@@ -130,7 +131,7 @@ FEngine
 - World가 시작된 뒤 생성된 Actor와 Actor가 시작된 뒤 추가된 Component는 즉시 BeginPlay한다. EndPlay와 Unregister는 실제 객체 메모리 해제 전에 수행한다.
 - 상위 컨테이너를 파괴할 때 Component, Actor, World 순서로 실제 해제한다. 직접 `DestroyObject`가 호출된 경우에도 부모는 자식 Handle의 슬롯이 반환될 때까지 FinishDestroy를 기다린다.
 - `USceneComponent`는 같은 Actor 안에서만 부모·자식 관계를 만들며 `ComponentToWorld = Local * ParentWorld` 규칙을 사용한다. 회전은 Euler 합성 순서가 확정되기 전까지 `FQuat` 값으로 보관한다.
-- `UPrimitiveComponent`는 Visibility, Cast Shadow, Local/World Bounds만 제공한다. `FScene`, SceneProxy, Geometry·Material과 Physics 연결은 아직 포함하지 않는다.
+- `UPrimitiveComponent`는 Visibility, Cast Shadow, Local/World Bounds를 소유하고 등록 생애주기 동안 `FScene`의 `FPrimitiveSceneProxy`와 값 기반으로 동기화한다. Geometry·Material과 Physics 연결은 아직 포함하지 않는다.
 
 ## Game Scene과 Render Scene 경계
 
@@ -144,7 +145,8 @@ UWorld                                      FScene
         ├─ 렌더 의도와 에셋 설정                 ├─ Geometry·Material render reference
         └─ FPrimitiveSceneHandle                 └─ Visibility·render flags
                │
-               ├─ Add(Description) ──────────────>
+               ├─ CreateSceneProxy(Description)
+               ├─ Add(Proxy) ────────────────────>
                ├─ Update(Handle, Values) ────────>
                └─ Remove(Handle) ────────────────>
 ```
@@ -155,14 +157,16 @@ UWorld                                      FScene
 - Renderer는 `UPrimitiveComponent`, Actor와 `UWorld`를 역참조하지 않고 `FScene`이 소유한 Render Scene 표현만 읽는다.
 - `UPrimitiveComponent`는 Transform, Bounds, Geometry·Material 설정, Visibility와 Cast Shadow 같은 렌더 의도를 소유한다.
 - Render Pass 선택, PSO와 Descriptor 구성, Draw 순서, D3D12 Command 기록과 제출은 Renderer 책임이며 Component에 넣지 않는다.
-- Component 등록 시 값 형태의 Scene description을 전달하고 안정적인 scene handle을 받는다. 이후 변경과 제거는 이 handle과 값 기반 갱신을 사용한다.
+- Component 등록 시 현재 상태를 값 형태의 Scene description으로 복사한 Proxy를 전달하고 `Index + Generation` scene handle을 받는다. 이후 변경과 제거는 이 handle과 값 기반 갱신을 사용한다.
 - 초기 구현은 Single Thread이므로 Add·Update·Remove를 동기적으로 적용한다. Render Thread와 비동기 update command queue는 필요해질 때 별도로 결정한다.
 - Culling은 Proxy를 `FScene`에서 등록 해제하지 않는다. 등록된 Proxy에서 View별·프레임별 Visible 목록을 별도로 만든다.
 - GPU resource의 실제 수명은 Component나 SceneProxy 포인터 수명에 기대지 않고 Renderer의 resource 관리와 Fence 완료 시점으로 관리한다.
 
 SceneProxy는 원본 Component 접근을 한 단계 감싸는 전달 객체나 성능 캐시로 정의하지 않는다. 책임 경계를 위해 독립된 Render Scene 상태를 보유하며, Component 상태를 다시 읽어야 하는 경우에는 명시적인 값 갱신을 추가한다. 이전 자체엔진처럼 Proxy가 Component 포인터를 보관하고 렌더 경로에서 역참조하는 혼합형은 사용하지 않는다.
 
-SceneProxy를 타입별 계층으로 구성할지 공통 데이터 표현으로 먼저 구현할지, scene description과 update payload를 어떤 단위로 나눌지, Geometry·Material render reference를 어떤 handle로 표현할지는 관련 타입을 구현할 때 확정한다. MeshBatch, PassProcessor, Render Graph와 RHI는 이 결정의 적용 범위가 아니다.
+현재 `FPrimitiveSceneProxy`는 Transform, Local/World Bounds, Visibility와 Cast Shadow만 보관하는 최소 다형 기반이다. `FScene`은 generation을 검증하는 슬롯으로 Proxy를 소유하고 Transform, Bounds와 Flags payload를 각각 동기 갱신한다. `UWorld`가 자신의 `FScene`을 소유하며 Renderer가 사용할 읽기 전용 Proxy 순회를 제공한다. 실제 Renderer의 Scene Draw 연결은 Geometry·Material render reference와 MeshBatch 표현을 결정할 때 추가한다.
+
+Geometry·Material render reference를 어떤 handle로 표현할지, 타입별 Proxy가 Renderer에 MeshBatch 또는 다른 render data를 어떤 인터페이스로 제공할지는 관련 타입을 구현할 때 확정한다. PassProcessor, Render Graph와 RHI는 이 결정의 적용 범위가 아니다.
 
 선택 이유와 검토한 대안은 [Game Scene과 Render Scene 책임 분리 결정](decisions/Game%20Scene과%20Render%20Scene%20책임%20분리%20결정.md)에 기록한다.
 
@@ -212,6 +216,6 @@ JisooGameEditor.exe -> main.cpp -> FEngineLoop.Run(FEditorEngine)
 
 현재 `FEngineLoop`는 최소 Win32 창을 생성하고 메시지를 처리하며 `steady_clock`으로 DeltaSeconds를 계산해, 창을 닫을 때까지 `FEngine::Tick`을 반복 호출한 뒤 종료한다. `FWindowsWindow`는 창과 네이티브 핸들을 소유하지만 범용 Application 계층은 두지 않는다.
 
-`FEngine`은 World Handle 목록과 D3D12 전용 `FRenderer`를 소유한다. 한 프레임은 World Tick → Renderer Frame → Pending UObject Flush 순서로 처리한다. 종료할 때는 World 파괴와 Pending UObject Flush를 먼저 수행한 뒤 Renderer를 종료한다. `FRenderer`는 RHI나 그래픽 API 다형성 계층 없이 `FD3D12Device`, `FD3D12CommandContext`, `FDXGISwapChain`과 프레임별 `FFrameResource`를 합성한다. 현재 렌더링 범위는 BackBuffer 상태 전환, Clear, Present와 Fence 기반 프레임 자원 재사용까지이며, Scene 렌더링과 Render Pipeline은 아직 연결하지 않는다.
+`FEngine`은 World Handle 목록과 D3D12 전용 `FRenderer`를 소유한다. 각 `UWorld`는 CPU-side `FScene`을 소유한다. 한 프레임은 World Tick → Renderer Frame → Pending UObject Flush 순서로 처리하므로 현재 Single Thread에서는 World Tick 동안 Scene 갱신을 끝내고 Renderer 구간에는 읽기 전용으로 취급한다. 종료할 때는 World 파괴와 Pending UObject Flush를 먼저 수행한 뒤 Renderer를 종료한다. `FRenderer`는 RHI나 그래픽 API 다형성 계층 없이 `FD3D12Device`, `FD3D12CommandContext`, `FDXGISwapChain`과 프레임별 `FFrameResource`를 합성한다. 현재 렌더링 범위는 BackBuffer 상태 전환, Clear, Present와 Fence 기반 프레임 자원 재사용까지이며, Proxy가 제공할 Geometry·Material 표현이 아직 없어 Scene Draw는 연결하지 않는다.
 
 에디터 화면, 편집·플레이 월드 전환, 게임 콘텐츠 로딩·패키징은 아직 구현되지 않았다.

@@ -134,10 +134,10 @@ if(BUILD_TESTING)
         "${JISOO_TEST_GENERATED_ROOT}/Reflection.gen.cpp"
     )
 
-    file(GLOB_RECURSE JISOO_OBJECT_SYSTEM_TEST_SOURCES
+    file(GLOB_RECURSE JISOO_ENGINE_TEST_SOURCES
         CONFIGURE_DEPENDS
-        "${CMAKE_CURRENT_SOURCE_DIR}/Tests/CoreUObject/*.cpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/Tests/CoreUObject/*.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/Tests/*.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/Tests/*.h"
     )
     file(GLOB_RECURSE JISOO_TEST_REFLECTION_HEADERS
         CONFIGURE_DEPENDS
@@ -183,24 +183,27 @@ if(BUILD_TESTING)
         PROPERTIES GENERATED TRUE
     )
 
-    add_executable(JisooObjectSystemTests
-        ${JISOO_OBJECT_SYSTEM_TEST_SOURCES}
+    add_executable(JisooEngineTests
+        ${JISOO_ENGINE_TEST_SOURCES}
         "${JISOO_TEST_REFLECTION_HUB}"
     )
     add_dependencies(
-        JisooObjectSystemTests
+        JisooEngineTests
         JisooEngineReflectionCode
         JisooEngineTestReflectionCode
     )
-    target_include_directories(JisooObjectSystemTests
+    target_include_directories(JisooEngineTests
         PRIVATE
             "${CMAKE_CURRENT_SOURCE_DIR}/Tests"
             "${JISOO_TEST_GENERATED_ROOT}"
     )
-    target_link_libraries(JisooObjectSystemTests PRIVATE JisooEngine::Runtime)
-    jisoo_configure_target(JisooObjectSystemTests "${CMAKE_CURRENT_SOURCE_DIR}")
+    target_link_libraries(JisooEngineTests PRIVATE JisooEngine::Runtime)
+    jisoo_configure_target(JisooEngineTests "${CMAKE_CURRENT_SOURCE_DIR}")
 
-    add_test(NAME JisooObjectSystem COMMAND JisooObjectSystemTests)
+    add_test(NAME Jisoo.CoreUObject COMMAND JisooEngineTests --suite CoreUObject)
+    add_test(NAME Jisoo.EngineLifecycle COMMAND JisooEngineTests --suite EngineLifecycle)
+    add_test(NAME Jisoo.SceneComponent COMMAND JisooEngineTests --suite SceneComponent)
+    add_test(NAME Jisoo.RenderScene COMMAND JisooEngineTests --suite RenderScene)
     add_test(
         NAME JisooHeaderGenerator
         COMMAND "${Python3_EXECUTABLE}" "${JISOO_HEADER_GENERATOR}" --self-test
@@ -209,11 +212,11 @@ if(BUILD_TESTING)
     source_group(
         TREE "${CMAKE_CURRENT_SOURCE_DIR}/Tests"
         PREFIX "Tests"
-        FILES ${JISOO_OBJECT_SYSTEM_TEST_SOURCES}
+        FILES ${JISOO_ENGINE_TEST_SOURCES}
     )
     source_group("Generated" FILES "${JISOO_TEST_REFLECTION_HUB}")
     set_property(
-        TARGET JisooObjectSystemTests JisooEngineTestReflectionCode
+        TARGET JisooEngineTests JisooEngineTestReflectionCode
         PROPERTY FOLDER "JisooEngine/Tests"
     )
 endif()

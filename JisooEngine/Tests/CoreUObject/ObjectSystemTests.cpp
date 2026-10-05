@@ -221,9 +221,12 @@ int main()
 
     UWorld* CascadingWorld = NewObject<UWorld>(nullptr, "CascadingWorld");
     AActor* CascadingActor = CascadingWorld->SpawnActor<AActor>("CascadingActor");
-    [[maybe_unused]] UActorComponent* CascadingComponent =
+    UActorComponent* CascadingComponent =
         CascadingActor->AddComponent<UActorComponent>("CascadingComponent");
     DestroyObject(CascadingWorld);
+    Expect(
+        CascadingComponent->GetWorld() == CascadingWorld,
+        "registered component keeps world access while world is pending destroy");
     FlushPendingDestroyObjects();
     Expect(
         GUObjectArray.GetObjectCount() == 0,
@@ -231,12 +234,15 @@ int main()
 
     UWorld* DirectActorWorld = NewObject<UWorld>(nullptr, "DirectActorWorld");
     AActor* DirectActor = DirectActorWorld->SpawnActor<AActor>("DirectActor");
-    [[maybe_unused]] UPrimitiveComponent* DirectPrimitive =
+    UPrimitiveComponent* DirectPrimitive =
         DirectActor->AddComponent<UPrimitiveComponent>("DirectPrimitive");
     Expect(
         DirectActorWorld->GetScene()->GetPrimitiveCount() == 1,
         "direct actor test registers primitive proxy");
     DestroyObject(DirectActor);
+    Expect(
+        DirectPrimitive->GetWorld() == DirectActorWorld,
+        "registered component keeps world access while owner is pending destroy");
     FlushPendingDestroyObjects();
     Expect(
         DirectActorWorld->GetScene()->GetPrimitiveCount() == 0,

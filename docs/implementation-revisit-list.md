@@ -10,8 +10,8 @@
   - `std::shared_ptr`이 아니라 `GUObjectArray`, GC와 Property 참조 추적을 이해하는 전용 타입으로 구현한다.
 - [ ] `Component → Owner`와 `SceneComponent → AttachParent/Children` 관계가 강한 참조인지 약한 참조인지 GC·직렬화·복제 요구와 함께 확정한다.
 - [ ] `AActor::GetWorld()`가 `PendingDestroy` 또는 `BeginDestroyed` World를 언제부터 `nullptr`로 취급할지 확정한다.
-  - EndPlay·OnUnregister 중 World 시스템 등록 해제에 필요한 접근 범위를 함께 검토한다.
-  - 필요하면 내부 정리용 `GetWorldEvenIfPendingDestroy()`를 분리한다.
+  - Component의 등록 해제는 캐시된 `RegisteredWorld`를 사용하므로 이 결정과 분리한다.
+  - 등록되지 않은 객체가 파괴 중 World에 접근해야 하는 사례가 생기면 별도 정리용 API를 검토한다.
 - [ ] `BeginDestroyed` 상태를 `BeginDestroy()` 호출 전과 후 중 언제 설정할지 확정한다.
 - [ ] World 파괴 중 `SpawnActor`, BeginPlay와 기타 상태 변경 API를 명시적으로 거부한다.
 - [ ] GC 도입 시 `Outer`, 강한 참조, Root Set과 도달성 규칙을 확정하고 수동 연쇄 파괴와의 역할을 재검토한다.

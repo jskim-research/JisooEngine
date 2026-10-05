@@ -18,6 +18,8 @@ class UActorComponent : public UObject
 
 public:
     [[nodiscard]] AActor* GetOwner() const;
+
+    /** 등록 중에는 실제 등록 World를 반환하고, 미등록 상태에서는 Owner의 World를 반환한다. */
     [[nodiscard]] UWorld* GetWorld() const;
     [[nodiscard]] bool IsRegistered() const;
     [[nodiscard]] bool HasBegunPlay() const;
@@ -37,6 +39,8 @@ protected:
     virtual void BeginPlay();
 
     virtual void OnRegister();
+
+    /** 등록 World가 유지된 상태에서 호출되며 반환한 뒤 Component의 등록 상태가 해제된다. */
     virtual void OnUnregister();
 
 private:
@@ -47,6 +51,7 @@ private:
     void DispatchEndPlay();
 
     FObjectHandle OwnerHandle;
+    UWorld* RegisteredWorld = nullptr;
     bool bRegistered = false;
     bool bHasBegunPlay = false;
     bool bTickEnabled = true;

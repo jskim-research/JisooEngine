@@ -2,6 +2,9 @@
 
 #include "Runtime/CoreUObject/ObjectGlobals.h"
 #include "Runtime/Engine/Actor.h"
+#include "Runtime/Engine/World.h"
+
+#include <cassert>
 
 UActorComponent::UActorComponent(const FObjectInitializer& ObjectInitializer)
     : Super(ObjectInitializer)
@@ -17,6 +20,11 @@ AActor* UActorComponent::GetOwner() const
 
 UWorld* UActorComponent::GetWorld() const
 {
+    if (RegisteredWorld != nullptr)
+    {
+        return RegisteredWorld;
+    }
+
     AActor* Owner = GetOwner();
     return Owner != nullptr ? Owner->GetWorld() : nullptr;
 }
@@ -74,7 +82,15 @@ void UActorComponent::RegisterComponent(AActor* InOwner)
         return;
     }
 
+    assert(RegisteredWorld == nullptr);
+    UWorld* World = InOwner->GetWorld();
+    if (!IsValid(World))
+    {
+        return;
+    }
+
     OwnerHandle = InOwner->GetHandle();
+    RegisteredWorld = World;
     bRegistered = true;
     OnRegister();
 }
@@ -86,9 +102,11 @@ void UActorComponent::UnregisterComponent()
         return;
     }
 
+    assert(RegisteredWorld != nullptr);
     DispatchEndPlay();
     OnUnregister();
     bRegistered = false;
+    RegisteredWorld = nullptr;
     OwnerHandle = {};
 }
 

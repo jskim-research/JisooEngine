@@ -1,6 +1,5 @@
 #include "Runtime/Engine/Components/PrimitiveComponent.h"
 
-#include "Runtime/Engine/Actor.h"
 #include "Runtime/Engine/World.h"
 #include "Runtime/Render/Scene/PrimitiveSceneProxy.h"
 #include "Runtime/Render/Scene/Scene.h"
@@ -110,11 +109,7 @@ void UPrimitiveComponent::OnUnregister()
 {
     if (PrimitiveSceneHandle.IsSet())
     {
-        // Actor의 직접 파괴 중에는 public Owner 해석이 실패하므로 정리 경로에서만 Outer를 사용한다.
-        AActor* OwnerEvenIfPendingDestroy = Cast<AActor>(GetOuter());
-        UWorld* World = OwnerEvenIfPendingDestroy != nullptr
-            ? OwnerEvenIfPendingDestroy->GetWorld()
-            : nullptr;
+        UWorld* World = GetWorld();
         FScene* Scene = World != nullptr ? World->GetScene() : nullptr;
         if (Scene != nullptr)
         {

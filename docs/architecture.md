@@ -129,6 +129,7 @@ FEngine
 - 컨테이너는 `FObjectHandle`을 보관하고 실제 할당과 해제는 CoreUObject가 담당한다. `Outer`는 World·Actor·Component의 논리적 소속과 이름 경로를 표현하지만 메모리 소유권으로 사용하지 않는다.
 - World와 Actor는 Tick 시작 시점의 Handle 목록을 복사해 순회한다. Tick 중 생성된 객체는 다음 프레임부터 참여하고, 파괴 요청된 객체는 Handle 해석에 실패하므로 남은 순회에서 제외된다.
 - World가 시작된 뒤 생성된 Actor와 Actor가 시작된 뒤 추가된 Component는 즉시 BeginPlay한다. EndPlay와 Unregister는 실제 객체 메모리 해제 전에 수행한다.
+- `UActorComponent`는 등록된 `UWorld`를 비소유 raw pointer로 캐시한다. 이 포인터는 `OnRegister` 전에 설정되고 `OnUnregister`가 끝난 뒤 해제되며, World는 등록된 Component의 정리가 끝날 때까지 실제 메모리를 유지한다.
 - 상위 컨테이너를 파괴할 때 Component, Actor, World 순서로 실제 해제한다. 직접 `DestroyObject`가 호출된 경우에도 부모는 자식 Handle의 슬롯이 반환될 때까지 FinishDestroy를 기다린다.
 - `USceneComponent`는 같은 Actor 안에서만 부모·자식 관계를 만들며 `ComponentToWorld = Local * ParentWorld` 규칙을 사용한다. 회전은 Euler 합성 순서가 확정되기 전까지 `FQuat` 값으로 보관한다.
 - `UPrimitiveComponent`는 Visibility, Cast Shadow, Local/World Bounds를 소유하고 등록 생애주기 동안 `FScene`의 `FPrimitiveSceneProxy`와 값 기반으로 동기화한다. Geometry·Material과 Physics 연결은 아직 포함하지 않는다.

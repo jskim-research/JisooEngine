@@ -1,12 +1,15 @@
 #include "Framework/TestRunner.h"
 
+#include "Editor/Viewport/EditorViewportClient.h"
 #include "Editor/Viewport/EditorViewportLayout.h"
 #include "Runtime/Engine/Viewport/SceneView.h"
 #include "Runtime/Engine/Viewport/Viewport.h"
 #include "Runtime/Engine/Viewport/ViewportClient.h"
+#include "Runtime/Input/InputSystem.h"
 #include "Runtime/Render/Renderer.h"
 #include "Runtime/Render/Scene/Scene.h"
 
+#include <cmath>
 #include <vector>
 
 namespace
@@ -23,6 +26,28 @@ namespace
         int DrawCount = 0;
         FViewport* LastViewport = nullptr;
     };
+
+    class FViewBuildingViewportClient final : public FViewportClient
+    {
+    public:
+        [[nodiscard]] FSceneView BuildView(const FViewport& Viewport) const
+        {
+            return BuildSceneView(Viewport);
+        }
+    };
+
+    bool IsNearlyEqual(float Left, float Right, float Tolerance = 0.001f)
+    {
+        return std::abs(Left - Right) <= Tolerance;
+    }
+
+    void EnqueueKeyEvent(FInputSystem& InputSystem, EInputEventType Type, EInputKey Key)
+    {
+        FInputEvent Event;
+        Event.Type = Type;
+        Event.Key = Key;
+        InputSystem.EnqueueInputEvent(Event);
+    }
 }
 
 void RegisterViewportTests(FTestRunner& Runner)
@@ -93,5 +118,75 @@ void RegisterViewportTests(FTestRunner& Runner)
             Test.Expect(VisibleViewports.size() == 1, "Single Layout은 Viewport 하나만 표시해야 한다.");
             Test.Expect(VisibleViewports.front()->GetOutput().Target == Target, "Layout이 Renderer가 발급한 Target Handle을 Slot Viewport에 보존해야 한다.");
             Test.Expect(Layout.GetLayoutMode() == EEditorViewportLayoutMode::Single, "초기 LayoutMode는 Single이어야 한다.");
+        });
+
+    Runner.Add(
+        "Viewport.EditorCameraMovesWithHeldKeys",
+        [](FTestContext& Test)
+        {
+            FInputSystem InputSystem;
+            FInputEvent FocusEvent;
+            FocusEvent.Type = EInputEventType::FocusGained;
+            InputSystem.EnqueueInputEvent(FocusEvent);
+            EnqueueKeyEvent(InputSystem, EInputEventType::KeyDown, EInputKey::W);
+            InputSystem.AdvanceFrame();
+
+            FEditorViewportClient Client;
+            Client.ProcessInput(InputSystem.GetCurrentFrame(), 0.5f);
+
+            const FVector& Position = Client.GetCameraPosition();
+            Test.Expect(IsNearlyEqual(Position.X, 250.0f), "W 입력은 기본 +X Forward로 초당 이동 속도와 DeltaSeconds를 반영해야 한다.");
+            Test.Expect(IsNearlyEqual(Position.Y, 0.0f), "Forward 이동은 기본 상태에서 Right 축 위치를 바꾸면 안 된다.");
+            Test.Expect(IsNearlyEqual(Position.Z, 0.0f), "Forward 이동은 기본 상태에서 Up 축 위치를 바꾸면 안 된다.");
+        });
+
+    Runner.Add(
+        "Viewport.EditorCameraRotatesWhileRightMouseHeld",
+        [](FTestContext& Test)
+        {
+            FInputSystem InputSystem;
+            FInputEvent FocusEvent;
+            FocusEvent.Type = EInputEventType::FocusGained;
+            InputSystem.EnqueueInputEvent(FocusEvent);
+            EnqueueKeyEvent(InputSystem, EInputEventType::KeyDown, EInputKey::MouseRight);
+
+            FInputEvent PointerEvent;
+            PointerEvent.Type = EInputEventType::PointerMove;
+            PointerEvent.DeltaX = 100;
+            PointerEvent.DeltaY = -200;
+            InputSystem.EnqueueInputEvent(PointerEvent);
+            InputSystem.AdvanceFrame();
+
+            FEditorViewportClient Client;
+            Client.ProcessInput(InputSystem.GetCurrentFrame(), 0.0f);
+
+            Test.Expect(IsNearlyEqual(Client.GetCameraYawDegrees(), 15.0f), "우클릭 중 가로 Pointer Delta가 Yaw에 감도를 적용해야 한다.");
+            Test.Expect(IsNearlyEqual(Client.GetCameraPitchDegrees(), -30.0f), "우클릭 중 세로 Pointer Delta가 Pitch에 감도를 적용해야 한다.");
+
+            EnqueueKeyEvent(InputSystem, EInputEventType::KeyUp, EInputKey::MouseRight);
+            PointerEvent.DeltaX = 50;
+            PointerEvent.DeltaY = 50;
+            InputSystem.EnqueueInputEvent(PointerEvent);
+            InputSystem.AdvanceFrame();
+            Client.ProcessInput(InputSystem.GetCurrentFrame(), 0.0f);
+
+            Test.Expect(IsNearlyEqual(Client.GetCameraYawDegrees(), 15.0f), "우클릭을 놓은 뒤 Pointer Delta는 Yaw를 바꾸면 안 된다.");
+            Test.Expect(IsNearlyEqual(Client.GetCameraPitchDegrees(), -30.0f), "우클릭을 놓은 뒤 Pointer Delta는 Pitch를 바꾸면 안 된다.");
+        });
+
+    Runner.Add(
+        "Viewport.CameraRotationAffectsViewMatrix",
+        [](FTestContext& Test)
+        {
+            constexpr FRenderTargetHandle Target{0, 1};
+            FViewport Viewport(Target, 1280, 720);
+            FViewBuildingViewportClient Client;
+            Client.SetCameraRotationDegrees(0.0f, 90.0f);
+
+            const FSceneView View = Client.BuildView(Viewport);
+
+            Test.Expect(IsNearlyEqual(View.ViewMatrix.M[0][2], 0.0f), "Yaw 90도에서 월드 +X는 View Forward 성분을 가지면 안 된다.");
+            Test.Expect(IsNearlyEqual(View.ViewMatrix.M[1][2], 1.0f), "Yaw 90도에서 월드 +Y가 View Forward가 되어야 한다.");
+            Test.Expect(IsNearlyEqual(View.ViewMatrix.M[0][0], -1.0f), "Yaw 90도에서 View Right는 월드 -X여야 한다.");
         });
 }

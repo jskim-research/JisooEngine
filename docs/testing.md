@@ -77,6 +77,9 @@ Viewport 출력 표면, Client 호출 경계와 Editor Layout의 초기 확장 �
 | `Viewport.SceneViewFamilyOwnsFrameViews` | Renderer 요청이 Scene, RenderTarget Handle과 프레임별 SceneView 목록을 값으로 함께 보관하는지 확인하기 위해 |
 | `Viewport.RejectsMissingRenderTarget` | 유효한 Target Handle이 없는 Viewport가 암묵적인 기본 BackBuffer로 렌더되지 않도록 보장하기 위해 |
 | `Viewport.EditorLayoutStartsWithSingleVisibleSlot` | 초기에는 Slot 0만 생성하면서 최대 네 Slot의 Layout 구조와 Single 표시 계약을 유지하는지 확인하기 위해 |
+| `Viewport.EditorCameraMovesWithHeldKeys` | Editor 카메라 이동이 지속 키 상태, cm/s 속도와 DeltaSeconds를 함께 반영하는지 확인하기 위해 |
+| `Viewport.EditorCameraRotatesWhileRightMouseHeld` | 우클릭 중 Pointer Delta만 Editor 카메라의 Yaw·Pitch로 해석하는지 확인하기 위해 |
+| `Viewport.CameraRotationAffectsViewMatrix` | +X Forward, +Y Right, +Z Up 규칙에 맞게 카메라 회전이 ViewMatrix 축을 변경하는지 확인하기 위해 |
 
 ## Input
 

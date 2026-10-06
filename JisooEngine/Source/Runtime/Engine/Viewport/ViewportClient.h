@@ -32,13 +32,24 @@ public:
     void SetCameraPosition(const FVector& InCameraPosition) noexcept;
     [[nodiscard]] const FVector& GetCameraPosition() const noexcept;
 
+    /** Pitch와 Yaw를 degree 단위로 설정하며 범위 제한은 구체 Client 정책이 결정한다. */
+    void SetCameraRotationDegrees(float InPitchDegrees, float InYawDegrees) noexcept;
+    [[nodiscard]] float GetCameraPitchDegrees() const noexcept;
+    [[nodiscard]] float GetCameraYawDegrees() const noexcept;
+
 protected:
     [[nodiscard]] virtual FSceneView BuildSceneView(const FViewport& Viewport) const;
+
+    [[nodiscard]] FVector GetCameraForwardVector() const noexcept;
+    [[nodiscard]] FVector GetCameraRightVector() const noexcept;
+    [[nodiscard]] FVector GetCameraUpVector() const noexcept;
 
 private:
     const FScene* Scene = nullptr;
     EViewMode ViewMode = EViewMode::Lit;
     FVector CameraPosition{};
+    float CameraPitchDegrees = 0.0f;
+    float CameraYawDegrees = 0.0f;
     float VerticalFieldOfViewDegrees = 60.0f;
     float NearPlane = 1.0f;
     float FarPlane = 100000.0f;

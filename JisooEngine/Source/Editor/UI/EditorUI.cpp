@@ -95,19 +95,6 @@ void FreeImGuiDescriptor(
     }
 }
 
-struct FImGuiRenderContext
-{
-    ImDrawData* DrawData = nullptr;
-    ID3D12DescriptorHeap* ShaderResourceViewHeap = nullptr;
-};
-
-void RecordImGuiDrawData(ID3D12GraphicsCommandList* CommandList, void* UserData)
-{
-    const auto& Context = *static_cast<FImGuiRenderContext*>(UserData);
-    ID3D12DescriptorHeap* DescriptorHeaps[] = {Context.ShaderResourceViewHeap};
-    CommandList->SetDescriptorHeaps(1, DescriptorHeaps);
-    ImGui_ImplDX12_RenderDrawData(Context.DrawData, CommandList);
-}
 }
 
 FEditorUI::FEditorUI() = default;
@@ -226,32 +213,43 @@ void FEditorUI::BuildFrame(const FInputFrame& InputFrame, float DeltaSeconds)
     bFrameBuilt = true;
 }
 
-bool FEditorUI::Render(FRenderer& InRenderer)
+void FEditorUI::SetDisplaySize(std::uint32_t Width, std::uint32_t Height)
 {
-    if (!bFrameBuilt || ViewportPanel == nullptr)
+    if (!bInitialized || Width == 0 || Height == 0)
     {
-        return false;
+        return;
     }
 
-    for (FViewport* Viewport : ViewportPanel->GetVisibleViewports())
+    ImGui::GetIO().DisplaySize = ImVec2(
+        static_cast<float>(Width),
+        static_cast<float>(Height));
+}
+
+void FEditorUI::RecordFinalOverlay(ID3D12GraphicsCommandList* CommandList, void* UserData)
+{
+    if (auto* EditorUI = static_cast<FEditorUI*>(UserData))
     {
-        if (Viewport != nullptr)
-        {
-            InRenderer.PrepareRenderTargetForSampling(Viewport->GetOutput().Target);
-        }
+        EditorUI->RecordFinalOverlay(CommandList);
+    }
+}
+
+void FEditorUI::RecordFinalOverlay(ID3D12GraphicsCommandList* CommandList)
+{
+    if (!bFrameBuilt || CommandList == nullptr || Renderer == nullptr)
+    {
+        return;
     }
 
     ImDrawData* DrawData = ImGui::GetDrawData();
-    FImGuiRenderContext RenderContext{
-        DrawData,
-        InRenderer.GetShaderResourceViewHeap()
-    };
-    const bool bRecorded = DrawData != nullptr && InRenderer.RecordExternalRenderPass(
-        InRenderer.GetMainRenderTargetHandle(),
-        &RecordImGuiDrawData,
-        &RenderContext);
+    if (DrawData != nullptr)
+    {
+        ID3D12DescriptorHeap* DescriptorHeaps[] = {
+            Renderer->GetShaderResourceViewHeap()
+        };
+        CommandList->SetDescriptorHeaps(1, DescriptorHeaps);
+        ImGui_ImplDX12_RenderDrawData(DrawData, CommandList);
+    }
     bFrameBuilt = false;
-    return bRecorded;
 }
 
 std::span<const FViewportInputRegion> FEditorUI::GetViewportInputRegions() const noexcept
@@ -271,6 +269,11 @@ std::span<FViewport* const> FEditorUI::GetVisibleViewports() const noexcept
 FViewport* FEditorUI::GetActiveViewport() const noexcept
 {
     return ViewportPanel != nullptr ? ViewportPanel->GetActiveViewport() : nullptr;
+}
+
+bool FEditorUI::SetActiveViewport(FViewport* Viewport) noexcept
+{
+    return ViewportPanel != nullptr && ViewportPanel->SetActiveViewport(Viewport);
 }
 
 bool FEditorUI::WantsKeyboardCapture() const noexcept

@@ -62,12 +62,7 @@ void FViewportPanel::Draw(std::vector<FViewportInputRegion>& OutRegions)
             if (EnsureLayout(Width, Height))
             {
                 FViewport* Viewport = Layout->GetVisibleViewports().front();
-                const FViewportOutput& Output = Viewport->GetOutput();
-                if ((Output.Width != Width || Output.Height != Height) &&
-                    Renderer->ResizeRenderTarget(RenderTarget, Width, Height))
-                {
-                    Viewport->Resize(Width, Height);
-                }
+                UpdateRenderSize(*Viewport, Width, Height);
 
                 const D3D12_GPU_DESCRIPTOR_HANDLE Texture =
                     Renderer->GetRenderTargetShaderResourceView(RenderTarget);
@@ -80,19 +75,6 @@ void FViewportPanel::Draw(std::vector<FViewportInputRegion>& OutRegions)
                     const ImVec2 ItemMin = ImGui::GetItemRectMin();
                     const ImVec2 ItemMax = ImGui::GetItemRectMax();
                     const bool bHovered = ImGui::IsItemHovered();
-                    if (bHovered)
-                    {
-                        for (int ButtonIndex = 0;
-                             ButtonIndex < ImGuiMouseButton_COUNT;
-                             ++ButtonIndex)
-                        {
-                            if (ImGui::IsMouseClicked(ButtonIndex))
-                            {
-                                Layout->SetActiveViewport(Viewport);
-                                break;
-                            }
-                        }
-                    }
                     OutRegions.push_back({
                         Viewport,
                         ItemMin.x,
@@ -135,6 +117,11 @@ FViewport* FViewportPanel::GetActiveViewport() const noexcept
     return Layout != nullptr ? Layout->GetActiveViewport() : nullptr;
 }
 
+bool FViewportPanel::SetActiveViewport(FViewport* Viewport) noexcept
+{
+    return Layout != nullptr && Layout->SetActiveViewport(Viewport);
+}
+
 const std::vector<FViewport*>& FViewportPanel::GetVisibleViewports() const noexcept
 {
     return VisibleViewports;
@@ -169,6 +156,45 @@ bool FViewportPanel::EnsureLayout(std::uint32_t Width, std::uint32_t Height)
     return true;
 }
 
+void FViewportPanel::UpdateRenderSize(
+    FViewport& Viewport,
+    std::uint32_t Width,
+    std::uint32_t Height)
+{
+    const FViewportOutput& Output = Viewport.GetOutput();
+    if (Output.Width == Width && Output.Height == Height)
+    {
+        PendingRenderWidth = 0;
+        PendingRenderHeight = 0;
+        return;
+    }
+
+    const double CurrentTime = ImGui::GetTime();
+    if (PendingRenderWidth != Width || PendingRenderHeight != Height)
+    {
+        PendingRenderWidth = Width;
+        PendingRenderHeight = Height;
+        LastRenderSizeChangeTime = CurrentTime;
+    }
+
+    constexpr double ResizeSettleSeconds = 0.1;
+    if (ImGui::IsMouseDown(ImGuiMouseButton_Left) ||
+        CurrentTime - LastRenderSizeChangeTime < ResizeSettleSeconds)
+    {
+        return;
+    }
+
+    if (Renderer->ResizeRenderTarget(RenderTarget, PendingRenderWidth, PendingRenderHeight))
+    {
+        Viewport.Resize(PendingRenderWidth, PendingRenderHeight);
+        PendingRenderWidth = 0;
+        PendingRenderHeight = 0;
+        return;
+    }
+
+    LastRenderSizeChangeTime = CurrentTime;
+}
+
 void FViewportPanel::ReleaseLayout()
 {
     VisibleViewports.clear();
@@ -178,4 +204,7 @@ void FViewportPanel::ReleaseLayout()
         Renderer->ReleaseRenderTarget(RenderTarget);
     }
     RenderTarget = {};
+    PendingRenderWidth = 0;
+    PendingRenderHeight = 0;
+    LastRenderSizeChangeTime = 0.0;
 }

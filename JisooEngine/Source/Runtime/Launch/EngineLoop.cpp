@@ -34,6 +34,20 @@ int FEngineLoop::Run(FEngine& Engine)
     auto PreviousFrameTime = std::chrono::steady_clock::now();
     while (Window.ProcessMessages())
     {
+        FWindowResizeEvent ResizeEvent;
+        if (Window.ConsumeResizeEvent(ResizeEvent))
+        {
+            if (!Engine.HandleWindowResize(ResizeEvent))
+            {
+                Window.SetInputEventSink(nullptr);
+                Engine.Shutdown();
+                return -1;
+            }
+
+            // GPU 대기가 포함될 수 있는 Resize 시간을 다음 Simulation Delta에 누적하지 않는다.
+            PreviousFrameTime = std::chrono::steady_clock::now();
+        }
+
         const auto CurrentFrameTime = std::chrono::steady_clock::now();
         const float DeltaSeconds = std::chrono::duration<float>(
             CurrentFrameTime - PreviousFrameTime).count();

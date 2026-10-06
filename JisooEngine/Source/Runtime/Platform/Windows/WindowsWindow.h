@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Runtime/Platform/WindowEvent.h"
+
 #include <Windows.h>
 
 #include <cstdint>
@@ -40,6 +42,9 @@ public:
     /** Sink는 Window보다 오래 살아야 하며, 해제 전 nullptr로 연결을 끊어야 한다. */
     void SetInputEventSink(IInputEventSink* InInputEventSink) noexcept;
 
+    /** 대기 중인 최신 Client Area 크기 변경을 반환하고 소비한다. */
+    bool ConsumeResizeEvent(FWindowResizeEvent& OutEvent) noexcept;
+
     HWND GetNativeHandle() const noexcept;
 
 private:
@@ -52,4 +57,6 @@ private:
     std::int32_t LastPointerX = 0;
     std::int32_t LastPointerY = 0;
     bool bHasPointerPosition = false;
+    FWindowResizeEvent PendingResizeEvent;
+    bool bHasPendingResizeEvent = false;
 };

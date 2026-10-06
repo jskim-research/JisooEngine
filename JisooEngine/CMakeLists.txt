@@ -249,6 +249,7 @@ if(BUILD_TESTING)
     add_test(NAME Jisoo.RenderScene COMMAND JisooEngineTests --suite RenderScene)
     add_test(NAME Jisoo.Viewport COMMAND JisooEngineTests --suite Viewport)
     add_test(NAME Jisoo.Input COMMAND JisooEngineTests --suite Input)
+    add_test(NAME Jisoo.Renderer COMMAND JisooEngineTests --suite Renderer)
     add_test(
         NAME JisooHeaderGenerator
         COMMAND "${Python3_EXECUTABLE}" "${JISOO_HEADER_GENERATOR}" --self-test

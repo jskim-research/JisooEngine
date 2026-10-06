@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Editor/Engine/EditorViewportInputRouting.h"
 #include "Runtime/Engine/Engine.h"
 
 #include <memory>
@@ -23,8 +24,9 @@ protected:
         const FInputFrame& InputFrame,
         float DeltaSeconds) override;
     void RenderFrame() override;
+    void OnWindowResized(std::uint32_t Width, std::uint32_t Height) override;
 
 private:
     std::unique_ptr<FEditorUI> EditorUI;
-    FViewport* CapturedPointerViewport = nullptr;
+    FEditorViewportInputRouting ViewportInputRouting;
 };

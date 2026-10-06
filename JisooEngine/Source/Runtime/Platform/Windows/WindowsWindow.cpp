@@ -187,6 +187,8 @@ void FWindowsWindow::Shutdown()
 
     InstanceHandle = nullptr;
     bHasPointerPosition = false;
+    PendingResizeEvent = {};
+    bHasPendingResizeEvent = false;
 }
 
 void FWindowsWindow::SetInputEventSink(IInputEventSink* InInputEventSink) noexcept
@@ -200,6 +202,18 @@ void FWindowsWindow::SetInputEventSink(IInputEventSink* InInputEventSink) noexce
             : EInputEventType::FocusLost;
         InputEventSink->EnqueueInputEvent(FocusEvent);
     }
+}
+
+bool FWindowsWindow::ConsumeResizeEvent(FWindowResizeEvent& OutEvent) noexcept
+{
+    if (!bHasPendingResizeEvent)
+    {
+        return false;
+    }
+
+    OutEvent = PendingResizeEvent;
+    bHasPendingResizeEvent = false;
+    return true;
 }
 
 HWND FWindowsWindow::GetNativeHandle() const noexcept
@@ -227,6 +241,16 @@ LRESULT CALLBACK FWindowsWindow::WindowProcedure(
 
     switch (Message)
     {
+    case WM_SIZE:
+        if (Window != nullptr)
+        {
+            Window->PendingResizeEvent.Width = LOWORD(LParam);
+            Window->PendingResizeEvent.Height = HIWORD(LParam);
+            Window->PendingResizeEvent.bMinimized = WParam == SIZE_MINIMIZED;
+            Window->bHasPendingResizeEvent = true;
+        }
+        return 0;
+
     case WM_SETFOCUS:
         if (Window != nullptr && Window->InputEventSink != nullptr)
         {

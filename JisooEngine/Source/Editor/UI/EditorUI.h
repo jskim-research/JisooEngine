@@ -14,6 +14,7 @@ class FViewport;
 class FViewportPanel;
 class FWorldOutlinerPanel;
 class UWorld;
+struct ID3D12GraphicsCommandList;
 
 /**
  * Editor 전용 ImGui Context와 DX12 Backend를 소유하고 Panel 구성 결과를 Engine에 제공한다.
@@ -39,18 +40,23 @@ public:
     /** 입력을 ImGui에 전달하고 모든 Panel을 구성해 이번 프레임 Region과 DrawData를 확정한다. */
     void BuildFrame(const FInputFrame& InputFrame, float DeltaSeconds);
 
-    /** 표시 중인 Viewport Target을 sampling 상태로 바꾸고 Main Target에 ImGui DrawData를 기록한다. */
-    bool Render(FRenderer& Renderer);
+    /** Window Client Area와 ImGui Main Viewport의 논리 pixel 크기를 동기화한다. */
+    void SetDisplaySize(std::uint32_t Width, std::uint32_t Height);
+
+    /** Renderer가 EndFrame의 최종 Overlay 단계에서 동기 호출하는 ImGui DrawData 기록 함수다. */
+    static void RecordFinalOverlay(ID3D12GraphicsCommandList* CommandList, void* UserData);
 
     [[nodiscard]] std::span<const FViewportInputRegion> GetViewportInputRegions() const noexcept;
     [[nodiscard]] std::span<FViewport* const> GetVisibleViewports() const noexcept;
     [[nodiscard]] FViewport* GetActiveViewport() const noexcept;
+    bool SetActiveViewport(FViewport* Viewport) noexcept;
     [[nodiscard]] bool WantsKeyboardCapture() const noexcept;
 
 private:
     void FeedInput(const FInputFrame& InputFrame);
     void BuildMainMenu();
     void BuildDockSpace();
+    void RecordFinalOverlay(ID3D12GraphicsCommandList* CommandList);
 
     FRenderer* Renderer = nullptr;
     UWorld* World = nullptr;

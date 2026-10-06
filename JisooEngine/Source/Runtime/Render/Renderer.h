@@ -21,7 +21,7 @@ struct FSceneViewFamily;
 class FRenderer
 {
 public:
-    using FExternalRenderPassRecorder = void(*)(
+    using FFinalOverlayPassRecorder = void(*)(
         ID3D12GraphicsCommandList* CommandList,
         void* UserData);
 
@@ -72,17 +72,13 @@ public:
      */
     void RenderViewFamily(const FSceneViewFamily& ViewFamily);
 
-    /** 현재 프레임에서 그린 Texture Target을 이후 Pass가 읽을 수 있는 상태로 전환한다. */
-    bool PrepareRenderTargetForSampling(FRenderTargetHandle Handle);
-
-    /** 지정 Target을 준비하고 RTV를 연결한 상태에서 외부 Pass의 명령 기록을 동기 호출한다. */
-    bool RecordExternalRenderPass(
-        FRenderTargetHandle Handle,
-        FExternalRenderPassRecorder Recorder,
-        void* UserData);
-
-    /** 사용한 Target을 최종 상태로 전환하고 명령 제출·Present·Fence 기록을 수행한다. */
-    bool EndFrame();
+    /**
+     * 사용한 off-screen Target을 sampling 상태로 전환한 뒤 선택적인 최종 Overlay를 Main Target에 기록하고
+     * 명령 제출·Present·Fence 기록을 수행한다. Overlay 뒤에는 다른 Render Pass를 기록할 수 없다.
+     */
+    bool EndFrame(
+        FFinalOverlayPassRecorder FinalOverlayRecorder = nullptr,
+        void* UserData = nullptr);
 
     /**
      * 제출된 GPU 작업을 완료한 뒤 SwapChain BackBuffer를 새 크기로 다시 생성한다.

@@ -1,5 +1,7 @@
 #include "Framework/TestRunner.h"
 
+#include "Editor/Engine/EditorViewportInputRouting.h"
+#include "Editor/UI/ViewportInputRegion.h"
 #include "Editor/Viewport/EditorViewportClient.h"
 #include "Editor/Viewport/EditorViewportLayout.h"
 #include "Runtime/Engine/Viewport/SceneView.h"
@@ -10,6 +12,7 @@
 #include "Runtime/Render/Scene/Scene.h"
 
 #include <cmath>
+#include <array>
 #include <vector>
 
 namespace
@@ -190,5 +193,108 @@ void RegisterViewportTests(FTestRunner& Runner)
             Test.Expect(IsNearlyEqual(View.ViewMatrix.M[0][2], 0.0f), "Yaw 90도에서 월드 +X는 View Forward 성분을 가지면 안 된다.");
             Test.Expect(IsNearlyEqual(View.ViewMatrix.M[1][2], 1.0f), "Yaw 90도에서 월드 +Y가 View Forward가 되어야 한다.");
             Test.Expect(IsNearlyEqual(View.ViewMatrix.M[0][0], -1.0f), "Yaw 90도에서 View Right는 월드 -X여야 한다.");
+        });
+
+    Runner.Add(
+        "Viewport.InputRoutingMaintainsActiveHoverAndCapturePolicy",
+        [](FTestContext& Test)
+        {
+            FViewport ViewportA({1, 1}, 800, 600);
+            FViewport ViewportB({2, 1}, 400, 300);
+            FDrawTrackingViewportClient ClientA;
+            FDrawTrackingViewportClient ClientB;
+            ViewportA.SetClient(&ClientA);
+            ViewportB.SetClient(&ClientB);
+
+            std::array<FViewportInputRegion, 2> Regions{{
+                {&ViewportA, 0.0f, 0.0f, 400.0f, 300.0f, true},
+                {&ViewportB, 400.0f, 0.0f, 800.0f, 300.0f, false}
+            }};
+            FInputSystem InputSystem;
+            FInputEvent FocusEvent;
+            FocusEvent.Type = EInputEventType::FocusGained;
+            InputSystem.EnqueueInputEvent(FocusEvent);
+            EnqueueKeyEvent(InputSystem, EInputEventType::KeyDown, EInputKey::MouseRight);
+            InputSystem.AdvanceFrame();
+
+            FEditorViewportInputRouting Routing;
+            FEditorViewportInputRoutingResult Result = Routing.Route(
+                InputSystem.GetCurrentFrame(),
+                Regions,
+                &ViewportB,
+                false);
+            Test.Expect(Result.ActivatedViewport == &ViewportA, "Hover된 A를 누르면 A가 활성 대상으로 보고되어야 한다.");
+            Test.Expect(Result.Context.PointerTarget == &ClientA, "Pointer Capture는 누르기 시작한 A를 대상으로 해야 한다.");
+            Test.Expect(Result.Context.KeyboardTarget == &ClientA, "활성화된 A가 같은 프레임 Keyboard 대상이어야 한다.");
+            Test.Expect(IsNearlyEqual(Result.Context.PointerScaleX, 2.0f), "표시 폭과 A의 RenderTarget 폭 비율을 Pointer X 배율로 사용해야 한다.");
+
+            Regions[0].bHovered = false;
+            Regions[1].bHovered = true;
+            InputSystem.AdvanceFrame();
+            Result = Routing.Route(
+                InputSystem.GetCurrentFrame(),
+                Regions,
+                &ViewportA,
+                false);
+            Test.Expect(Result.Context.PointerTarget == &ClientA, "누른 채 B로 이동해도 Pointer는 Capture된 A에 남아야 한다.");
+            Test.Expect(Result.Context.KeyboardTarget == &ClientA, "Hover 이동은 지속 Active Viewport를 바꾸면 안 된다.");
+
+            EnqueueKeyEvent(InputSystem, EInputEventType::KeyUp, EInputKey::MouseRight);
+            InputSystem.AdvanceFrame();
+            Result = Routing.Route(
+                InputSystem.GetCurrentFrame(),
+                Regions,
+                &ViewportA,
+                false);
+            Test.Expect(Result.Context.PointerTarget == &ClientA, "Button Release까지 Capture된 A에 전달되어야 한다.");
+
+            InputSystem.AdvanceFrame();
+            Result = Routing.Route(
+                InputSystem.GetCurrentFrame(),
+                Regions,
+                &ViewportA,
+                true);
+            Test.Expect(Result.Context.PointerTarget == &ClientB, "Capture 해제 다음 프레임부터 Hover된 B가 Pointer 대상이어야 한다.");
+            Test.Expect(Result.Context.KeyboardTarget == nullptr, "ImGui가 Keyboard를 점유하면 Active Viewport 전달을 막아야 한다.");
+        });
+
+    Runner.Add(
+        "Viewport.InputRoutingDropsCaptureWhenViewportDisappears",
+        [](FTestContext& Test)
+        {
+            FViewport ViewportA({1, 1}, 800, 600);
+            FViewport ViewportB({2, 1}, 800, 600);
+            FDrawTrackingViewportClient ClientA;
+            FDrawTrackingViewportClient ClientB;
+            ViewportA.SetClient(&ClientA);
+            ViewportB.SetClient(&ClientB);
+
+            FInputSystem InputSystem;
+            FInputEvent FocusEvent;
+            FocusEvent.Type = EInputEventType::FocusGained;
+            InputSystem.EnqueueInputEvent(FocusEvent);
+            EnqueueKeyEvent(InputSystem, EInputEventType::KeyDown, EInputKey::MouseLeft);
+            InputSystem.AdvanceFrame();
+            FEditorViewportInputRouting Routing;
+            const std::array<FViewportInputRegion, 1> RegionA{{
+                {&ViewportA, 0.0f, 0.0f, 800.0f, 600.0f, true}
+            }};
+            const FEditorViewportInputRoutingResult InitialResult = Routing.Route(
+                InputSystem.GetCurrentFrame(),
+                RegionA,
+                &ViewportA,
+                false);
+            Test.Expect(InitialResult.Context.PointerTarget == &ClientA, "A를 누른 프레임에 Pointer Capture를 시작해야 한다.");
+
+            InputSystem.AdvanceFrame();
+            const std::array<FViewportInputRegion, 1> RegionB{{
+                {&ViewportB, 0.0f, 0.0f, 800.0f, 600.0f, true}
+            }};
+            const FEditorViewportInputRoutingResult Result = Routing.Route(
+                InputSystem.GetCurrentFrame(),
+                RegionB,
+                &ViewportB,
+                false);
+            Test.Expect(Result.Context.PointerTarget == &ClientB, "Capture된 A가 사라지면 만료된 대상을 버리고 Hover된 B를 선택해야 한다.");
         });
 }

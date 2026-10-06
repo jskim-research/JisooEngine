@@ -280,48 +280,49 @@ void FRenderer::RenderViewFamily(const FSceneViewFamily& ViewFamily)
     }
 }
 
-bool FRenderer::PrepareRenderTargetForSampling(FRenderTargetHandle Handle)
-{
-    FRenderTargetSlot* Target = ResolveRenderTarget(Handle);
-    if (ActiveFrameResource == nullptr || Target == nullptr || Target->Resource == nullptr ||
-        Target->ShaderResourceViewGpu.ptr == 0)
-    {
-        return false;
-    }
-
-    if (Target->CurrentState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE)
-    {
-        CommandContext.TransitionResource(
-            Target->Resource,
-            Target->CurrentState,
-            D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-        Target->CurrentState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-    }
-    return true;
-}
-
-bool FRenderer::RecordExternalRenderPass(
-    FRenderTargetHandle Handle,
-    FExternalRenderPassRecorder Recorder,
+bool FRenderer::EndFrame(
+    FFinalOverlayPassRecorder FinalOverlayRecorder,
     void* UserData)
-{
-    FRenderTargetSlot* Target = ResolveRenderTarget(Handle);
-    if (Recorder == nullptr || Target == nullptr || !PrepareRenderTarget(*Target))
-    {
-        return false;
-    }
-
-    ID3D12GraphicsCommandList* CommandList = CommandContext.GetCommandList();
-    CommandList->OMSetRenderTargets(1, &Target->RenderTargetView, FALSE, nullptr);
-    Recorder(CommandList, UserData);
-    return true;
-}
-
-bool FRenderer::EndFrame()
 {
     if (ActiveFrameResource == nullptr)
     {
         return false;
+    }
+
+    FRenderTargetSlot* MainTarget = ResolveRenderTarget(MainRenderTargetHandle);
+    if (MainTarget == nullptr)
+    {
+        ActiveFrameResource = nullptr;
+        return false;
+    }
+
+    if (FinalOverlayRecorder != nullptr)
+    {
+        // Overlay가 off-screen 출력을 읽으므로 Main Target을 제외한 사용 Target을 먼저 최종 상태로 만든다.
+        for (FRenderTargetSlot& Target : RenderTargetSlots)
+        {
+            if (&Target == MainTarget || !Target.bUsedThisFrame || Target.Resource == nullptr ||
+                Target.CurrentState == Target.FinalState)
+            {
+                continue;
+            }
+
+            CommandContext.TransitionResource(
+                Target.Resource,
+                Target.CurrentState,
+                Target.FinalState);
+            Target.CurrentState = Target.FinalState;
+        }
+
+        if (!PrepareRenderTarget(*MainTarget))
+        {
+            ActiveFrameResource = nullptr;
+            return false;
+        }
+
+        ID3D12GraphicsCommandList* CommandList = CommandContext.GetCommandList();
+        CommandList->OMSetRenderTargets(1, &MainTarget->RenderTargetView, FALSE, nullptr);
+        FinalOverlayRecorder(CommandList, UserData);
     }
 
     for (FRenderTargetSlot& Target : RenderTargetSlots)
@@ -360,6 +361,16 @@ bool FRenderer::Resize(std::uint32_t Width, std::uint32_t Height)
         return false;
     }
 
+    FRenderTargetSlot* MainTarget = ResolveRenderTarget(MainRenderTargetHandle);
+    if (MainTarget == nullptr)
+    {
+        return false;
+    }
+    if (MainTarget->Width == Width && MainTarget->Height == Height)
+    {
+        return true;
+    }
+
     // ResizeBuffers 전에 BackBuffer를 참조하는 GPU 작업과 CPU 소유 참조를 모두 끝내야 한다.
     if (!CommandContext.WaitForGpu())
     {
@@ -372,12 +383,6 @@ bool FRenderer::Resize(std::uint32_t Width, std::uint32_t Height)
     }
 
     if (!SwapChain.Resize(Device.GetDevice(), Width, Height))
-    {
-        return false;
-    }
-
-    FRenderTargetSlot* MainTarget = ResolveRenderTarget(MainRenderTargetHandle);
-    if (MainTarget == nullptr)
     {
         return false;
     }

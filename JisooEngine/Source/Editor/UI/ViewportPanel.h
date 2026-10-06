@@ -34,10 +34,12 @@ public:
     void SetOpen(bool bInOpen);
     [[nodiscard]] bool IsOpen() const noexcept;
     [[nodiscard]] FViewport* GetActiveViewport() const noexcept;
+    bool SetActiveViewport(FViewport* Viewport) noexcept;
     [[nodiscard]] const std::vector<FViewport*>& GetVisibleViewports() const noexcept;
 
 private:
     bool EnsureLayout(std::uint32_t Width, std::uint32_t Height);
+    void UpdateRenderSize(FViewport& Viewport, std::uint32_t Width, std::uint32_t Height);
     void ReleaseLayout();
 
     FRenderer* Renderer = nullptr;
@@ -45,5 +47,8 @@ private:
     std::unique_ptr<FEditorViewportLayout> Layout;
     std::vector<FViewport*> VisibleViewports;
     FRenderTargetHandle RenderTarget;
+    std::uint32_t PendingRenderWidth = 0;
+    std::uint32_t PendingRenderHeight = 0;
+    double LastRenderSizeChangeTime = 0.0;
     bool bOpen = true;
 };

@@ -22,6 +22,7 @@ protected:
         const FInputFrame& InputFrame,
         float DeltaSeconds) override;
     void RenderFrame() override;
+    void OnWindowResized(std::uint32_t Width, std::uint32_t Height) override;
 
 private:
     std::unique_ptr<FViewport> Viewport;

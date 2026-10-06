@@ -197,7 +197,7 @@ FWindowsWindow::WndProc
 - `FInputRouter`는 입력을 해석하지 않고 구체 Engine이 만든 `FInputRouteContext`의 Keyboard·Pointer Target에 허용된 채널만 전달한다. 같은 Client가 두 채널을 소유하면 한 번만 호출한다.
 - 현재 Game은 `FGameViewportClient`를 두 채널의 고정 Target으로 사용한다. Editor는 Hover·Capture된 Viewport를 Pointer Target으로, Layout의 Active Viewport를 Keyboard Target으로 선택한다. 공통 Client의 기본 `ProcessInput`은 아무 동작도 하지 않으며, Editor Client가 우클릭 Pointer Delta와 WASD·QE를 비행 카메라 회전·이동으로 해석한다.
 - ImGui 의존 코드는 Editor 계층과 vendoring한 ThirdParty Backend에만 둔다. `FEditorUI`가 Runtime의 `FInputFrame`을 ImGui IO로 전달하므로 `FWindowsWindow`, `FInputSystem`과 `FInputRouter`는 ImGui 타입을 참조하지 않는다.
-- Engine Tick은 입력 프레임 확정 뒤 `RouteCurrentInput()`에서 Route Context 생성과 `FInputRouter` 호출을 한 단계로 수행한다. Editor의 Context 생성은 먼저 Panel을 구성하며, `FViewportPanel`은 ImGui Image Item의 배치·Hover를 프레임 한정 `FViewportInputRegion`으로 보고하고 Pointer Press가 발생한 Viewport를 Layout의 Active Viewport로 지정한다. `FEditorEngine`은 Capture 또는 Hover 대상을 Pointer Target으로, Active Viewport를 Keyboard Target으로 선택한다.
+- Engine Tick은 입력 프레임 확정 뒤 `RouteCurrentInput()`에서 Route Context 생성과 `FInputRouter` 호출을 한 단계로 수행한다. Editor의 Context 생성은 먼저 Panel을 구성하며, `FViewportPanel`은 ImGui Image Item의 배치·Hover를 프레임 한정 `FViewportInputRegion`으로 보고한다. `FEditorViewportInputRouting`은 Region, Pointer Button과 지속 Capture를 값 기반으로 조합해 Click된 Viewport를 Active 대상으로 보고하고 Capture 또는 Hover 대상을 Pointer Target으로, Active Viewport를 Keyboard Target으로 선택한다.
 - `FInputRouter`는 선택된 Region의 Window 좌표 원점과 RenderTarget 배율을 Pointer 위치·Delta에 적용해 `FViewportClient`에는 Viewport pixel 좌표를 전달한다. Text 입력은 UTF-16 code unit 목록으로 한 Tick만 보관하며 Editor UI의 `InputText`에 공급한다.
 
 ## Viewport와 View 렌더 요청
@@ -224,7 +224,7 @@ FEditorEngine
 - `FEditorViewportLayout`은 최대 네 Slot의 수명과 배치·표시 정책 및 활성 Client 조회를 소유하고 Renderer를 참조하지 않는다. 현재는 Single 모드의 Slot 0만 생성하고 활성 대상으로 사용한다.
 - Editor와 Game의 구체 Engine은 World Tick 이후 Renderer 프레임을 열고, 표시할 Viewport의 Draw 진입점을 호출한 뒤 프레임을 닫는다. Client는 Family 제출만 하며 BeginFrame, EndFrame과 Present를 제어하지 않는다.
 - Renderer는 `Index + Generation` Target Handle을 내부 슬롯으로 해석한다. 현재 Main Target 슬롯은 프레임 시작에 DXGI가 선택한 BackBuffer와 RTV에 연결되며, 같은 Handle이라도 실제 BackBuffer는 프레임마다 달라질 수 있다.
-- Renderer는 `BeginFrame -> RenderViewFamily 1..N -> EndFrame` 순서를 제공한다. `RenderViewFamily`는 Family가 지정한 Target을 최초 사용할 때 RenderTarget 상태로 전환·Clear하고 `FMeshPassPipeline`을 실행하며, EndFrame은 사용한 Target을 최종 상태로 되돌린 뒤 프레임당 한 번 제출·Present·Fence signal한다.
+- Renderer는 `BeginFrame -> RenderViewFamily 1..N -> EndFrame` 순서를 제공한다. `RenderViewFamily`는 Family가 지정한 Target을 최초 사용할 때 RenderTarget 상태로 전환·Clear하고 `FMeshPassPipeline`을 실행한다. `EndFrame`은 사용한 off-screen Target을 sampling 가능한 최종 상태로 전환하고 선택적인 최종 Overlay를 Main Target에 기록한 뒤, 모든 Target의 최종 상태 복원과 프레임당 한 번의 제출·Present·Fence signal을 수행한다. Overlay 뒤에는 다른 Render Pass를 기록하지 않는다.
 - View와 Projection은 왼손 좌표계, +X Forward, +Y Right, +Z Up과 행벡터 규칙을 따르며 `View * Projection` 순서로 합성한다.
 
 Editor 실행의 현재 소유권과 프레임 흐름은 다음과 같다.
@@ -243,8 +243,8 @@ InputFrame → ImGui Panel 구성·Region 수집 → Input Route → World Tick
 
 - `FEditorUI`는 Editor 전용 ImGui Context와 DX12 Backend, DockSpace와 구체 Panel 구성을 소유한다. Game 실행 타깃은 ImGui 소스와 Editor UI를 링크하지 않는다.
 - `FViewportPanel`은 `FEditorViewportLayout`을 소유한다. Panel이 보이는 프레임만 Layout의 Viewport를 렌더 목록에 노출하며, 닫으면 Layout·Viewport와 Renderer Target을 해제하고 다시 열 때 기본 상태로 생성한다. Camera·ViewMode·Layout 상태 복원은 아직 구현하지 않는다.
-- Renderer는 off-screen Color Target의 Resource·RTV·SRV와 재사용 가능한 Target Slot을 소유한다. Panel은 Handle과 ImGui Texture ID로 사용하는 GPU Descriptor 값만 조회한다.
-- Scene Viewport 렌더 뒤 Color Target을 `PIXEL_SHADER_RESOURCE`로 전환하고, Main SwapChain Target에 ImGui DrawData를 기록한 뒤 한 번만 Present한다. ImGui Pass는 Renderer의 Shader-visible SRV Heap을 명시적으로 연결한다.
+- Renderer는 off-screen Color Target의 Resource·RTV·SRV와 재사용 가능한 Target Slot을 소유한다. Panel은 Handle과 ImGui Texture ID로 사용하는 GPU Descriptor 값만 조회한다. Panel 표시 영역이 연속 변경되는 동안에는 기존 Target을 새 사각형에 스케일해 표시하고, 크기가 안정화된 뒤에만 GPU 완료를 기다려 Target과 Viewport 출력 크기를 한 번 갱신한다.
+- Scene Viewport 렌더 뒤 `EndFrame`이 Color Target을 `PIXEL_SHADER_RESOURCE`로 전환하고 Main SwapChain Target에 ImGui DrawData를 최종 Overlay로 기록한 뒤 한 번만 Present한다. ImGui Overlay는 Renderer의 Shader-visible SRV Heap을 명시적으로 연결한다.
 - 최초 수직 구현은 Single Viewport와 World Outliner의 Actor 검색·Panel 내부 선택까지만 포함한다. 실제 2·4분할 활성화, Depth Target, Grid·Gizmo, 공용 Selection System과 Wireframe·Depth·WorldNormal Pass는 아직 포함하지 않는다.
 
 ## 코드 배치 기준
@@ -291,7 +291,7 @@ JisooGame.exe       -> main.cpp -> FEngineLoop.Run(FGameEngine)
 JisooGameEditor.exe -> main.cpp -> FEngineLoop.Run(FEditorEngine)
 ```
 
-현재 `FEngineLoop`는 최소 Win32 창을 생성하고 메시지를 처리하며 `steady_clock`으로 DeltaSeconds를 계산해, 창을 닫을 때까지 `FEngine::Tick`을 반복 호출한 뒤 종료한다. `FWindowsWindow`는 창과 네이티브 핸들을 소유하지만 범용 Application 계층은 두지 않는다.
+현재 `FEngineLoop`는 최소 Win32 창을 생성하고 메시지를 처리하며 `steady_clock`으로 DeltaSeconds를 계산해, 창을 닫을 때까지 `FEngine::Tick`을 반복 호출한 뒤 종료한다. `FWindowsWindow`는 창과 네이티브 핸들을 소유하지만 범용 Application 계층은 두지 않는다. `WM_SIZE`는 최신 Client Area 크기와 최소화 여부만 담은 `FWindowResizeEvent`로 변환되고, EngineLoop가 프레임 사이에 이를 Engine에 전달한다. Engine은 SwapChain Resize 성공 뒤 Game Viewport 또는 Editor ImGui `DisplaySize`를 같은 크기로 동기화하며 최소화 중에는 렌더링을 중단한다.
 
 `FEngine`은 Input System·Router, World Handle 목록과 D3D12 전용 `FRenderer`를 소유한다. 각 `UWorld`는 CPU-side `FScene`을 소유한다. 한 프레임은 Input Frame 확정·라우팅 → World Tick → 구체 Engine의 Viewport Render → Pending UObject Flush 순서로 처리하므로 현재 Single Thread에서는 World Tick 동안 Scene 갱신을 끝내고 Renderer 구간에는 읽기 전용으로 취급한다. 종료할 때는 Window의 입력 Sink 연결을 먼저 끊고, 구체 Engine이 Viewport·Client를 해제한 뒤 World 파괴와 Pending UObject Flush를 수행하고 Renderer를 종료한다. `FRenderer`는 RHI나 그래픽 API 다형성 계층 없이 `FD3D12Device`, `FD3D12CommandContext`, `FDXGISwapChain`, RenderTarget Handle 슬롯, 프레임별 `FFrameResource`와 `FMeshPassPipeline`을 합성한다. 현재 렌더링 범위는 Family가 지정한 Target의 상태 전환과 Clear, View별 Visible MeshBatch 수집, 순서가 있는 단일 Opaque Mesh Pass의 Draw Command 생성·기록, Present와 Fence 기반 프레임 자원 재사용까지다.
 

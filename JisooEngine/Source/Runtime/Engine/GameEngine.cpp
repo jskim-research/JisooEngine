@@ -71,3 +71,11 @@ void FGameEngine::RenderFrame()
     Viewport->Draw(*FrameRenderer);
     FrameRenderer->EndFrame();
 }
+
+void FGameEngine::OnWindowResized(std::uint32_t Width, std::uint32_t Height)
+{
+    if (Viewport != nullptr)
+    {
+        Viewport->Resize(Width, Height);
+    }
+}

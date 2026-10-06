@@ -3,6 +3,7 @@
 #include "Runtime/CoreUObject/ObjectHandle.h"
 #include "Runtime/Input/InputRouter.h"
 #include "Runtime/Input/InputSystem.h"
+#include "Runtime/Platform/WindowEvent.h"
 
 #include <cstdint>
 #include <memory>
@@ -56,6 +57,12 @@ public:
     /** Window가 입력 이벤트를 전달할 비소유 연결 지점을 반환한다. */
     [[nodiscard]] IInputEventSink& GetInputEventSink() noexcept;
 
+    /**
+     * Window Client Area 변경을 프레임 시작 전에 Renderer와 구체 Engine에 적용한다.
+     * 최소화 이벤트는 GPU 자원을 재생성하지 않고 복원될 때까지 렌더링을 중단한다.
+     */
+    bool HandleWindowResize(const FWindowResizeEvent& Event);
+
 protected:
     /** 현재 입력 프레임을 바탕으로 실행 모드의 활성·Hover·Capture 정책을 적용한 대상을 반환한다. */
     [[nodiscard]] virtual FInputRouteContext BuildInputRouteContext(
@@ -64,6 +71,9 @@ protected:
 
     /** World Tick 이후 구체 Engine이 Viewport 렌더 요청을 제출하는 프레임 단계다. */
     virtual void RenderFrame();
+
+    /** Renderer의 SwapChain Resize가 성공한 뒤 구체 Engine의 출력 크기를 동기화한다. */
+    virtual void OnWindowResized(std::uint32_t Width, std::uint32_t Height);
 
     [[nodiscard]] FRenderer* GetRenderer() const noexcept;
 
@@ -74,5 +84,6 @@ private:
     FInputRouter InputRouter;
     std::unique_ptr<FRenderer> Renderer;
     std::vector<FObjectHandle> Worlds;
+    bool bWindowMinimized = false;
     bool bInitialized = false;
 };

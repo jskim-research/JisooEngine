@@ -9,6 +9,7 @@ void RegisterSceneComponentTests(FTestRunner& Runner);
 void RegisterRenderSceneTests(FTestRunner& Runner);
 void RegisterViewportTests(FTestRunner& Runner);
 void RegisterInputTests(FTestRunner& Runner);
+void RegisterRendererTests(FTestRunner& Runner);
 
 int main(int ArgumentCount, char* Arguments[])
 {
@@ -30,5 +31,6 @@ int main(int ArgumentCount, char* Arguments[])
     RegisterRenderSceneTests(Runner);
     RegisterViewportTests(Runner);
     RegisterInputTests(Runner);
+    RegisterRendererTests(Runner);
     return Runner.Run(Suite);
 }

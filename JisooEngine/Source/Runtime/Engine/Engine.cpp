@@ -86,7 +86,10 @@ void FEngine::Tick(float DeltaSeconds)
         }
     }
 
-    RenderFrame();
+    if (!bWindowMinimized)
+    {
+        RenderFrame();
+    }
 
     FlushPendingDestroyObjects();
 }
@@ -109,6 +112,7 @@ void FEngine::Shutdown()
     }
 
     bInitialized = false;
+    bWindowMinimized = false;
 }
 
 UWorld* FEngine::CreateWorld(std::string Name)
@@ -166,6 +170,24 @@ IInputEventSink& FEngine::GetInputEventSink() noexcept
     return InputSystem;
 }
 
+bool FEngine::HandleWindowResize(const FWindowResizeEvent& Event)
+{
+    if (Event.bMinimized)
+    {
+        bWindowMinimized = true;
+        return true;
+    }
+    if (Renderer == nullptr || Event.Width == 0 || Event.Height == 0 ||
+        !Renderer->Resize(Event.Width, Event.Height))
+    {
+        return false;
+    }
+
+    bWindowMinimized = false;
+    OnWindowResized(Event.Width, Event.Height);
+    return true;
+}
+
 void FEngine::RouteCurrentInput(float DeltaSeconds)
 {
     const FInputFrame& InputFrame = InputSystem.GetCurrentFrame();
@@ -181,6 +203,10 @@ FInputRouteContext FEngine::BuildInputRouteContext(const FInputFrame&, float)
 }
 
 void FEngine::RenderFrame()
+{
+}
+
+void FEngine::OnWindowResized(std::uint32_t, std::uint32_t)
 {
 }
 

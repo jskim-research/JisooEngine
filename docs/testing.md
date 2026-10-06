@@ -80,6 +80,17 @@ Viewport 출력 표면, Client 호출 경계와 Editor Layout의 초기 확장 �
 | `Viewport.EditorCameraMovesWithHeldKeys` | Editor 카메라 이동이 지속 키 상태, cm/s 속도와 DeltaSeconds를 함께 반영하는지 확인하기 위해 |
 | `Viewport.EditorCameraRotatesWhileRightMouseHeld` | 우클릭 중 Pointer Delta만 Editor 카메라의 Yaw·Pitch로 해석하는지 확인하기 위해 |
 | `Viewport.CameraRotationAffectsViewMatrix` | +X Forward, +Y Right, +Z Up 규칙에 맞게 카메라 회전이 ViewMatrix 축을 변경하는지 확인하기 위해 |
+| `Viewport.InputRoutingMaintainsActiveHoverAndCapturePolicy` | 두 Viewport 사이에서 Click이 Active와 Capture를 정하고 Drag·Release 동안 Capture를 유지하며 ImGui Keyboard 점유를 존중하는지 확인하기 위해 |
+| `Viewport.InputRoutingDropsCaptureWhenViewportDisappears` | Capture된 Viewport가 닫히거나 Region에서 사라졌을 때 만료된 Client 대신 현재 Hover 대상을 선택하는지 확인하기 위해 |
+
+## Renderer
+
+Renderer의 GPU Target 수명과 프레임 마지막 Overlay 계약을 실제 D3D12 Device와 숨겨진 Window로 검증한다.
+
+| 검증 항목 | 이유 |
+|---|---|
+| `Renderer.RenderTargetHandleRejectsReleasedGeneration` | Texture Target 해제 뒤 Slot을 재사용해도 Generation이 다른 이전 Handle로 새 자원과 SRV를 해석하지 못하도록 보장하기 위해 |
+| `Renderer.EndFrameRecordsFinalOverlayBeforePresent` | Scene 렌더 뒤의 선택적 UI Overlay가 임의 중간 Pass가 아니라 EndFrame 내부의 마지막 기록 단계로 실행되는지 확인하기 위해 |
 
 ## Input
 

@@ -36,12 +36,14 @@ bool FEditorViewportLayout::Initialize(
     Slot->Client->SetViewMode(EViewMode::Lit);
     Slot->Viewport->SetClient(Slot->Client.get());
     Slots[0] = std::move(Slot);
+    ActiveViewport = Slots[0]->Viewport.get();
     LayoutMode = EEditorViewportLayoutMode::Single;
     return true;
 }
 
 void FEditorViewportLayout::Shutdown()
 {
+    ActiveViewport = nullptr;
     for (std::unique_ptr<FEditorViewportSlot>& Slot : Slots)
     {
         Slot.reset();
@@ -59,9 +61,34 @@ std::vector<FViewport*> FEditorViewportLayout::GetVisibleViewports() const
     return Result;
 }
 
+bool FEditorViewportLayout::SetActiveViewport(FViewport* Viewport) noexcept
+{
+    for (const std::unique_ptr<FEditorViewportSlot>& Slot : Slots)
+    {
+        if (Slot != nullptr && Slot->Viewport.get() == Viewport)
+        {
+            ActiveViewport = Viewport;
+            return true;
+        }
+    }
+    return false;
+}
+
+FViewport* FEditorViewportLayout::GetActiveViewport() const noexcept
+{
+    return ActiveViewport;
+}
+
 FEditorViewportClient* FEditorViewportLayout::GetActiveViewportClient() const noexcept
 {
-    return Slots[0] != nullptr ? Slots[0]->Client.get() : nullptr;
+    for (const std::unique_ptr<FEditorViewportSlot>& Slot : Slots)
+    {
+        if (Slot != nullptr && Slot->Viewport.get() == ActiveViewport)
+        {
+            return Slot->Client.get();
+        }
+    }
+    return nullptr;
 }
 
 std::size_t FEditorViewportLayout::GetCreatedSlotCount() const noexcept

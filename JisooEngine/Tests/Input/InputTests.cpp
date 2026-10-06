@@ -1,5 +1,6 @@
 #include "Framework/TestRunner.h"
 
+#include "Runtime/Engine/Engine.h"
 #include "Runtime/Input/InputRouter.h"
 #include "Runtime/Input/InputSystem.h"
 
@@ -20,6 +21,24 @@ namespace
         int ProcessCount = 0;
     };
 
+    class FRouteBuildingEngine final : public FEngine
+    {
+    public:
+        FTrackingInputReceiver Receiver;
+        int BuildCount = 0;
+        bool bBuildSawPressedKey = false;
+
+    protected:
+        FInputRouteContext BuildInputRouteContext(
+            const FInputFrame& InputFrame,
+            float) override
+        {
+            ++BuildCount;
+            bBuildSawPressedKey = InputFrame.WasPressed(EInputKey::W);
+            return {&Receiver, &Receiver};
+        }
+    };
+
     FInputEvent MakeEvent(EInputEventType Type, EInputKey Key = EInputKey::Unknown)
     {
         FInputEvent Event;
@@ -31,6 +50,24 @@ namespace
 
 void RegisterInputTests(FTestRunner& Runner)
 {
+    Runner.Add(
+        "Input.EngineBuildsRouteContextBeforeRoutingCurrentFrame",
+        [](FTestContext& Test)
+        {
+            FRouteBuildingEngine Engine;
+            Engine.GetInputEventSink().EnqueueInputEvent(
+                MakeEvent(EInputEventType::FocusGained));
+            Engine.GetInputEventSink().EnqueueInputEvent(
+                MakeEvent(EInputEventType::KeyDown, EInputKey::W));
+
+            Engine.Tick(0.25f);
+
+            Test.Expect(Engine.BuildCount == 1, "Engine Tick은 현재 프레임의 Route Context를 한 번 생성해야 한다.");
+            Test.Expect(Engine.bBuildSawPressedKey, "Route Context 생성은 확정된 현재 입력 프레임을 받아야 한다.");
+            Test.Expect(Engine.Receiver.ProcessCount == 1, "생성된 Route Context는 같은 단계에서 즉시 라우팅되어야 한다.");
+            Test.Expect(Engine.Receiver.LastFrame.WasPressed(EInputKey::W), "Receiver는 Context 생성에 사용된 것과 같은 입력 프레임을 받아야 한다.");
+        });
+
     Runner.Add(
         "Input.FramePreservesHeldStateAndResetsTransitions",
         [](FTestContext& Test)
@@ -96,6 +133,34 @@ void RegisterInputTests(FTestRunner& Runner)
         });
 
     Runner.Add(
+        "Input.FrameCollectsTextInputForOneTick",
+        [](FTestContext& Test)
+        {
+            FInputSystem InputSystem;
+            InputSystem.EnqueueInputEvent(MakeEvent(EInputEventType::FocusGained));
+
+            FInputEvent FirstCharacter = MakeEvent(EInputEventType::TextInput);
+            FirstCharacter.Character = u'A';
+            InputSystem.EnqueueInputEvent(FirstCharacter);
+
+            FInputEvent SecondCharacter = MakeEvent(EInputEventType::TextInput);
+            SecondCharacter.Character = u'한';
+            InputSystem.EnqueueInputEvent(SecondCharacter);
+            InputSystem.AdvanceFrame();
+
+            const std::span<const char16_t> TextInput =
+                InputSystem.GetCurrentFrame().GetTextInput();
+            Test.Expect(TextInput.size() == 2, "한 Tick에 도착한 UTF-16 문자 입력을 순서대로 보관해야 한다.");
+            if (TextInput.size() == 2)
+            {
+                Test.Expect(TextInput[0] == u'A' && TextInput[1] == u'한', "문자 입력 값과 순서를 유지해야 한다.");
+            }
+
+            InputSystem.AdvanceFrame();
+            Test.Expect(InputSystem.GetCurrentFrame().GetTextInput().empty(), "문자 입력은 다음 Tick까지 유지되면 안 된다.");
+        });
+
+    Runner.Add(
         "Input.RouterSeparatesKeyboardAndPointerTargets",
         [](FTestContext& Test)
         {
@@ -147,5 +212,38 @@ void RegisterInputTests(FTestRunner& Runner)
             Test.Expect(Receiver.LastFrame.IsDown(EInputKey::W), "공유 Target은 Keyboard 상태를 받아야 한다.");
             Test.Expect(Receiver.LastFrame.IsDown(EInputKey::MouseRight), "공유 Target은 Pointer 상태를 받아야 한다.");
             Test.Expect(Receiver.LastDeltaSeconds == 0.5f, "Router는 현재 DeltaSeconds를 Receiver에 전달해야 한다.");
+        });
+
+    Runner.Add(
+        "Input.RouterTransformsPointerIntoTargetPixels",
+        [](FTestContext& Test)
+        {
+            FInputSystem InputSystem;
+            InputSystem.EnqueueInputEvent(MakeEvent(EInputEventType::FocusGained));
+
+            FInputEvent PointerMove = MakeEvent(EInputEventType::PointerMove);
+            PointerMove.PositionX = 300;
+            PointerMove.PositionY = 170;
+            PointerMove.DeltaX = 8;
+            PointerMove.DeltaY = 4;
+            InputSystem.EnqueueInputEvent(PointerMove);
+            InputSystem.AdvanceFrame();
+
+            FTrackingInputReceiver PointerReceiver;
+            FInputRouteContext Context{};
+            Context.PointerTarget = &PointerReceiver;
+            Context.PointerOriginX = 100;
+            Context.PointerOriginY = 50;
+            Context.PointerScaleX = 2.0f;
+            Context.PointerScaleY = 0.5f;
+            Context.bTransformPointerToTarget = true;
+
+            FInputRouter Router;
+            Router.Route(InputSystem.GetCurrentFrame(), Context, 0.0f);
+
+            Test.Expect(PointerReceiver.LastFrame.GetPointerX() == 400, "Window X 좌표를 Region 원점과 Target 배율로 변환해야 한다.");
+            Test.Expect(PointerReceiver.LastFrame.GetPointerY() == 60, "Window Y 좌표를 Region 원점과 Target 배율로 변환해야 한다.");
+            Test.Expect(PointerReceiver.LastFrame.GetPointerDeltaX() == 16, "Pointer X Delta에도 Target 배율을 적용해야 한다.");
+            Test.Expect(PointerReceiver.LastFrame.GetPointerDeltaY() == 2, "Pointer Y Delta에도 Target 배율을 적용해야 한다.");
         });
 }

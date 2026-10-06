@@ -4,7 +4,9 @@
 
 #include <memory>
 
-class FEditorViewportLayout;
+class FEditorUI;
+class FInputFrame;
+class FViewport;
 
 /** 공통 Editor 기능을 실행하기 위한 구체 엔진 타입이다. */
 class FEditorEngine : public FEngine
@@ -17,9 +19,12 @@ public:
     void Shutdown() override;
 
 protected:
-    [[nodiscard]] FInputRouteContext BuildInputRouteContext() override;
+    [[nodiscard]] FInputRouteContext BuildInputRouteContext(
+        const FInputFrame& InputFrame,
+        float DeltaSeconds) override;
     void RenderFrame() override;
 
 private:
-    std::unique_ptr<FEditorViewportLayout> ViewportLayout;
+    std::unique_ptr<FEditorUI> EditorUI;
+    FViewport* CapturedPointerViewport = nullptr;
 };

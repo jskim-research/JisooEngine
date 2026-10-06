@@ -75,7 +75,7 @@ bool FEngine::Initialize(const FEngineInitParams& InitParams)
 void FEngine::Tick(float DeltaSeconds)
 {
     InputSystem.AdvanceFrame();
-    InputRouter.Route(InputSystem.GetCurrentFrame(), BuildInputRouteContext(), DeltaSeconds);
+    RouteCurrentInput(DeltaSeconds);
 
     const std::vector<FObjectHandle> WorldSnapshot = Worlds;
     for (const FObjectHandle Handle : WorldSnapshot)
@@ -166,7 +166,16 @@ IInputEventSink& FEngine::GetInputEventSink() noexcept
     return InputSystem;
 }
 
-FInputRouteContext FEngine::BuildInputRouteContext()
+void FEngine::RouteCurrentInput(float DeltaSeconds)
+{
+    const FInputFrame& InputFrame = InputSystem.GetCurrentFrame();
+    InputRouter.Route(
+        InputFrame,
+        BuildInputRouteContext(InputFrame, DeltaSeconds),
+        DeltaSeconds);
+}
+
+FInputRouteContext FEngine::BuildInputRouteContext(const FInputFrame&, float)
 {
     return {};
 }

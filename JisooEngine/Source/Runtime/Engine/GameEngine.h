@@ -18,7 +18,9 @@ public:
     void Shutdown() override;
 
 protected:
-    [[nodiscard]] FInputRouteContext BuildInputRouteContext() override;
+    [[nodiscard]] FInputRouteContext BuildInputRouteContext(
+        const FInputFrame& InputFrame,
+        float DeltaSeconds) override;
     void RenderFrame() override;
 
 private:

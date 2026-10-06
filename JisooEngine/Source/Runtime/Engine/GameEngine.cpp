@@ -55,7 +55,7 @@ void FGameEngine::Shutdown()
     FEngine::Shutdown();
 }
 
-FInputRouteContext FGameEngine::BuildInputRouteContext()
+FInputRouteContext FGameEngine::BuildInputRouteContext(const FInputFrame&, float)
 {
     return {ViewportClient.get(), ViewportClient.get()};
 }

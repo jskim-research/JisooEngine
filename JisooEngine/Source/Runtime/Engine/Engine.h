@@ -57,8 +57,10 @@ public:
     [[nodiscard]] IInputEventSink& GetInputEventSink() noexcept;
 
 protected:
-    /** 현재 실행 모드의 Focus와 Capture 정책으로 이번 프레임 입력 대상을 선택한다. */
-    [[nodiscard]] virtual FInputRouteContext BuildInputRouteContext();
+    /** 현재 입력 프레임을 바탕으로 실행 모드의 활성·Hover·Capture 정책을 적용한 대상을 반환한다. */
+    [[nodiscard]] virtual FInputRouteContext BuildInputRouteContext(
+        const FInputFrame& InputFrame,
+        float DeltaSeconds);
 
     /** World Tick 이후 구체 Engine이 Viewport 렌더 요청을 제출하는 프레임 단계다. */
     virtual void RenderFrame();
@@ -66,6 +68,8 @@ protected:
     [[nodiscard]] FRenderer* GetRenderer() const noexcept;
 
 private:
+    void RouteCurrentInput(float DeltaSeconds);
+
     FInputSystem InputSystem;
     FInputRouter InputRouter;
     std::unique_ptr<FRenderer> Renderer;

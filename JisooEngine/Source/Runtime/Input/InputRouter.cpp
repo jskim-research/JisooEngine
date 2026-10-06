@@ -1,5 +1,28 @@
 #include "Runtime/Input/InputRouter.h"
 
+#include <cmath>
+
+void FInputRouter::TransformPointerToTarget(
+    FInputFrame& InputFrame,
+    const FInputRouteContext& Context)
+{
+    if (!Context.bTransformPointerToTarget)
+    {
+        return;
+    }
+
+    InputFrame.PointerX = static_cast<std::int32_t>(std::lround(
+        static_cast<float>(InputFrame.PointerX - Context.PointerOriginX) *
+        Context.PointerScaleX));
+    InputFrame.PointerY = static_cast<std::int32_t>(std::lround(
+        static_cast<float>(InputFrame.PointerY - Context.PointerOriginY) *
+        Context.PointerScaleY));
+    InputFrame.PointerDeltaX = static_cast<std::int32_t>(std::lround(
+        static_cast<float>(InputFrame.PointerDeltaX) * Context.PointerScaleX));
+    InputFrame.PointerDeltaY = static_cast<std::int32_t>(std::lround(
+        static_cast<float>(InputFrame.PointerDeltaY) * Context.PointerScaleY));
+}
+
 void FInputRouter::Route(
     const FInputFrame& InputFrame,
     const FInputRouteContext& Context,
@@ -8,7 +31,9 @@ void FInputRouter::Route(
     if (Context.KeyboardTarget != nullptr &&
         Context.KeyboardTarget == Context.PointerTarget)
     {
-        Context.KeyboardTarget->ProcessInput(InputFrame, DeltaSeconds);
+        FInputFrame RoutedFrame = InputFrame;
+        TransformPointerToTarget(RoutedFrame, Context);
+        Context.KeyboardTarget->ProcessInput(RoutedFrame, DeltaSeconds);
         return;
     }
 
@@ -23,6 +48,7 @@ void FInputRouter::Route(
     {
         FInputFrame PointerFrame = InputFrame;
         PointerFrame.ClearKeyboardInput();
+        TransformPointerToTarget(PointerFrame, Context);
         Context.PointerTarget->ProcessInput(PointerFrame, DeltaSeconds);
     }
 }

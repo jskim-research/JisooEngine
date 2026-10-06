@@ -40,6 +40,11 @@ float FInputFrame::GetWheelDelta() const noexcept
     return WheelDelta;
 }
 
+std::span<const char16_t> FInputFrame::GetTextInput() const noexcept
+{
+    return TextInput;
+}
+
 bool FInputFrame::HasPointerPosition() const noexcept
 {
     return bHasPointerPosition;
@@ -68,6 +73,8 @@ void FInputFrame::ClearKeyboardInput() noexcept
             ReleasedKeys[Index] = false;
         }
     }
+
+    TextInput.clear();
 }
 
 void FInputFrame::ClearPointerInput() noexcept

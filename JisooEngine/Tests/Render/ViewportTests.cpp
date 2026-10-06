@@ -117,6 +117,8 @@ void RegisterViewportTests(FTestRunner& Runner)
             const std::vector<FViewport*> VisibleViewports = Layout.GetVisibleViewports();
             Test.Expect(VisibleViewports.size() == 1, "Single Layout은 Viewport 하나만 표시해야 한다.");
             Test.Expect(VisibleViewports.front()->GetOutput().Target == Target, "Layout이 Renderer가 발급한 Target Handle을 Slot Viewport에 보존해야 한다.");
+            Test.Expect(Layout.GetActiveViewport() == VisibleViewports.front(), "Single Layout의 첫 Viewport는 초기 활성 대상이어야 한다.");
+            Test.Expect(Layout.GetActiveViewportClient() == VisibleViewports.front()->GetClient(), "활성 Client는 활성 Viewport에 연결된 Client여야 한다.");
             Test.Expect(Layout.GetLayoutMode() == EEditorViewportLayoutMode::Single, "초기 LayoutMode는 Single이어야 한다.");
         });
 

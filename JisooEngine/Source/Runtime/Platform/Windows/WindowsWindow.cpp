@@ -282,6 +282,16 @@ LRESULT CALLBACK FWindowsWindow::WindowProcedure(
         }
         break;
 
+    case WM_CHAR:
+        if (Window != nullptr && Window->InputEventSink != nullptr)
+        {
+            FInputEvent Event;
+            Event.Type = EInputEventType::TextInput;
+            Event.Character = static_cast<char16_t>(WParam);
+            Window->InputEventSink->EnqueueInputEvent(Event);
+        }
+        return 0;
+
     case WM_MOUSEMOVE:
         if (Window != nullptr && Window->InputEventSink != nullptr)
         {

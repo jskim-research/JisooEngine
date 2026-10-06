@@ -23,7 +23,9 @@ Repository/
 │  │  │  └─ Render/           # Render Scene과 D3D12 Renderer
 │  │  └─ Editor/
 │  │     ├─ Engine/           # FEditorEngine
+│  │     ├─ UI/               # ImGui Context, DockSpace와 Editor Panel 구성
 │  │     └─ Viewport/         # Editor ViewportClient와 최대 4 Slot Layout
+│  ├─ ThirdParty/ImGui/       # Editor 타깃에서만 빌드하는 Dear ImGui와 DX12 Backend
 │  ├─ Content/
 │  ├─ Config/
 │  ├─ Shaders/
@@ -193,8 +195,10 @@ FWindowsWindow::WndProc
 - `FWindowsWindow`는 Win32 메시지를 플랫폼 독립 `FInputEvent`로 바꾸고 등록된 Sink에 전달할 뿐 입력 상태와 대상을 소유하지 않는다. `FEngineLoop`가 Window와 Engine을 연결하고 Engine 종료 전에 연결을 해제한다.
 - `FInputSystem`은 Tick 사이에 도착한 이벤트를 대기 큐에 값으로 보관한다. Engine Tick 시작에 이를 순서대로 소비해 지속 `Down`, 프레임 한정 `Pressed`·`Released`, Pointer 위치·Delta, Wheel과 Focus를 `FInputFrame`으로 확정한다.
 - `FInputRouter`는 입력을 해석하지 않고 구체 Engine이 만든 `FInputRouteContext`의 Keyboard·Pointer Target에 허용된 채널만 전달한다. 같은 Client가 두 채널을 소유하면 한 번만 호출한다.
-- 현재 Game은 `FGameViewportClient`, Editor는 Single Layout의 활성 `FEditorViewportClient`를 두 채널의 Target으로 사용한다. 공통 Client의 기본 `ProcessInput`은 아무 동작도 하지 않으며, Editor Client가 우클릭 Pointer Delta와 WASD·QE를 비행 카메라 회전·이동으로 해석한다.
-- Editor UI 도입 시 ImGui 의존 코드는 Editor 계층에만 두고, Hover·Focus·Capture와 UI 점유 결과를 중립적인 `FInputRouteContext`로 변환한다. Runtime Input Router는 ImGui 타입을 참조하지 않는다.
+- 현재 Game은 `FGameViewportClient`를 두 채널의 고정 Target으로 사용한다. Editor는 Hover·Capture된 Viewport를 Pointer Target으로, Layout의 Active Viewport를 Keyboard Target으로 선택한다. 공통 Client의 기본 `ProcessInput`은 아무 동작도 하지 않으며, Editor Client가 우클릭 Pointer Delta와 WASD·QE를 비행 카메라 회전·이동으로 해석한다.
+- ImGui 의존 코드는 Editor 계층과 vendoring한 ThirdParty Backend에만 둔다. `FEditorUI`가 Runtime의 `FInputFrame`을 ImGui IO로 전달하므로 `FWindowsWindow`, `FInputSystem`과 `FInputRouter`는 ImGui 타입을 참조하지 않는다.
+- Engine Tick은 입력 프레임 확정 뒤 `RouteCurrentInput()`에서 Route Context 생성과 `FInputRouter` 호출을 한 단계로 수행한다. Editor의 Context 생성은 먼저 Panel을 구성하며, `FViewportPanel`은 ImGui Image Item의 배치·Hover를 프레임 한정 `FViewportInputRegion`으로 보고하고 Pointer Press가 발생한 Viewport를 Layout의 Active Viewport로 지정한다. `FEditorEngine`은 Capture 또는 Hover 대상을 Pointer Target으로, Active Viewport를 Keyboard Target으로 선택한다.
+- `FInputRouter`는 선택된 Region의 Window 좌표 원점과 RenderTarget 배율을 Pointer 위치·Delta에 적용해 `FViewportClient`에는 Viewport pixel 좌표를 전달한다. Text 입력은 UTF-16 code unit 목록으로 한 Tick만 보관하며 Editor UI의 `InputText`에 공급한다.
 
 ## Viewport와 View 렌더 요청
 
@@ -223,7 +227,25 @@ FEditorEngine
 - Renderer는 `BeginFrame -> RenderViewFamily 1..N -> EndFrame` 순서를 제공한다. `RenderViewFamily`는 Family가 지정한 Target을 최초 사용할 때 RenderTarget 상태로 전환·Clear하고 `FMeshPassPipeline`을 실행하며, EndFrame은 사용한 Target을 최종 상태로 되돌린 뒤 프레임당 한 번 제출·Present·Fence signal한다.
 - View와 Projection은 왼손 좌표계, +X Forward, +Y Right, +Z Up과 행벡터 규칙을 따르며 `View * Projection` 순서로 합성한다.
 
-Editor UI 도입 시 Renderer가 off-screen Color·Depth Target과 SRV를 생성·등록하고 발급한 Handle을 Layout Slot에 연결한다. ImGui Panel은 Slot을 소유하지 않고 content pixel 크기와 interaction 상태를 Layout/Viewport에 전달한다. 실제 2·4분할 활성화, UI Hit Test·Focus·Capture와 Raw Mouse 연결, Grid·Gizmo와 Wireframe·Depth·WorldNormal Pass는 아직 포함하지 않는다.
+Editor 실행의 현재 소유권과 프레임 흐름은 다음과 같다.
+
+```text
+FEditorEngine
+└─ FEditorUI
+   ├─ FViewportPanel
+   │  └─ FEditorViewportLayout
+   │     └─ Slot[0] ─ FViewport ─ FEditorViewportClient
+   └─ FWorldOutlinerPanel
+
+InputFrame → ImGui Panel 구성·Region 수집 → Input Route → World Tick
+           → off-screen Viewport 렌더 → Main Target ImGui 합성 → Present
+```
+
+- `FEditorUI`는 Editor 전용 ImGui Context와 DX12 Backend, DockSpace와 구체 Panel 구성을 소유한다. Game 실행 타깃은 ImGui 소스와 Editor UI를 링크하지 않는다.
+- `FViewportPanel`은 `FEditorViewportLayout`을 소유한다. Panel이 보이는 프레임만 Layout의 Viewport를 렌더 목록에 노출하며, 닫으면 Layout·Viewport와 Renderer Target을 해제하고 다시 열 때 기본 상태로 생성한다. Camera·ViewMode·Layout 상태 복원은 아직 구현하지 않는다.
+- Renderer는 off-screen Color Target의 Resource·RTV·SRV와 재사용 가능한 Target Slot을 소유한다. Panel은 Handle과 ImGui Texture ID로 사용하는 GPU Descriptor 값만 조회한다.
+- Scene Viewport 렌더 뒤 Color Target을 `PIXEL_SHADER_RESOURCE`로 전환하고, Main SwapChain Target에 ImGui DrawData를 기록한 뒤 한 번만 Present한다. ImGui Pass는 Renderer의 Shader-visible SRV Heap을 명시적으로 연결한다.
+- 최초 수직 구현은 Single Viewport와 World Outliner의 Actor 검색·Panel 내부 선택까지만 포함한다. 실제 2·4분할 활성화, Depth Target, Grid·Gizmo, 공용 Selection System과 Wireframe·Depth·WorldNormal Pass는 아직 포함하지 않는다.
 
 ## 코드 배치 기준
 

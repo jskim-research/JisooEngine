@@ -2,11 +2,18 @@
 
 #include "Runtime/Input/InputInterfaces.h"
 
+#include <cstdint>
+
 /** Editor나 Game이 현재 포커스·캡처 정책으로 선택한 입력 대상들이다. */
 struct FInputRouteContext
 {
     IInputReceiver* KeyboardTarget = nullptr;
     IInputReceiver* PointerTarget = nullptr;
+    std::int32_t PointerOriginX = 0;
+    std::int32_t PointerOriginY = 0;
+    float PointerScaleX = 1.0f;
+    float PointerScaleY = 1.0f;
+    bool bTransformPointerToTarget = false;
 };
 
 /**
@@ -20,4 +27,9 @@ public:
         const FInputFrame& InputFrame,
         const FInputRouteContext& Context,
         float DeltaSeconds) const;
+
+private:
+    static void TransformPointerToTarget(
+        FInputFrame& InputFrame,
+        const FInputRouteContext& Context);
 };

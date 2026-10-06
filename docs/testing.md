@@ -76,7 +76,7 @@ Viewport 출력 표면, Client 호출 경계와 Editor Layout의 초기 확장 �
 | `Viewport.DrawForwardsToAssociatedClient` | FViewport가 렌더 정책을 소유하지 않고 연결된 Client의 Draw 진입점을 정확히 호출하는지 확인하기 위해 |
 | `Viewport.SceneViewFamilyOwnsFrameViews` | Renderer 요청이 Scene, RenderTarget Handle과 프레임별 SceneView 목록을 값으로 함께 보관하는지 확인하기 위해 |
 | `Viewport.RejectsMissingRenderTarget` | 유효한 Target Handle이 없는 Viewport가 암묵적인 기본 BackBuffer로 렌더되지 않도록 보장하기 위해 |
-| `Viewport.EditorLayoutStartsWithSingleVisibleSlot` | 초기에는 Slot 0만 생성하면서 최대 네 Slot의 Layout 구조와 Single 표시 계약을 유지하는지 확인하기 위해 |
+| `Viewport.EditorLayoutStartsWithSingleVisibleSlot` | 초기에는 Slot 0만 생성하면서 최대 네 Slot의 Layout 구조, Single 표시 계약과 초기 Active Viewport를 함께 유지하는지 확인하기 위해 |
 | `Viewport.EditorCameraMovesWithHeldKeys` | Editor 카메라 이동이 지속 키 상태, cm/s 속도와 DeltaSeconds를 함께 반영하는지 확인하기 위해 |
 | `Viewport.EditorCameraRotatesWhileRightMouseHeld` | 우클릭 중 Pointer Delta만 Editor 카메라의 Yaw·Pitch로 해석하는지 확인하기 위해 |
 | `Viewport.CameraRotationAffectsViewMatrix` | +X Forward, +Y Right, +Z Up 규칙에 맞게 카메라 회전이 ViewMatrix 축을 변경하는지 확인하기 위해 |
@@ -87,7 +87,10 @@ Viewport 출력 표면, Client 호출 경계와 Editor Layout의 초기 확장 �
 
 | 검증 항목 | 이유 |
 |---|---|
+| `Input.EngineBuildsRouteContextBeforeRoutingCurrentFrame` | Engine Tick이 확정된 현재 입력으로 Route Context를 만든 뒤 같은 단계에서 즉시 라우팅해 준비·라우팅 호출 순서가 분리되지 않도록 보장하기 위해 |
 | `Input.FramePreservesHeldStateAndResetsTransitions` | Down 상태는 유지하면서 Pressed·Released와 Pointer·Wheel Delta가 한 프레임에만 남는지 확인하기 위해 |
 | `Input.FocusLossReleasesHeldKeys` | Window Focus를 잃었을 때 고착된 Keyboard·Pointer 입력이 남지 않도록 보장하기 위해 |
+| `Input.FrameCollectsTextInputForOneTick` | WM_CHAR에서 변환한 UTF-16 입력이 순서를 유지하면서 해당 Tick에만 ImGui 같은 UI 소비자에게 제공되는지 확인하기 위해 |
 | `Input.RouterSeparatesKeyboardAndPointerTargets` | UI와 다중 Viewport 확장 시 서로 다른 Keyboard·Pointer 대상에 허용된 채널만 전달되는지 확인하기 위해 |
 | `Input.RouterCallsSharedTargetOnce` | 하나의 ViewportClient가 두 채널을 모두 소유할 때 같은 프레임 입력을 중복 처리하지 않도록 보장하기 위해 |
+| `Input.RouterTransformsPointerIntoTargetPixels` | Window 좌표와 Delta가 선택된 Viewport Region의 원점·배율을 따라 RenderTarget pixel 좌표로 변환되는지 확인하기 위해 |

@@ -3,6 +3,8 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <span>
+#include <vector>
 
 enum class EInputKey : std::uint16_t
 {
@@ -130,6 +132,7 @@ enum class EInputEventType : std::uint8_t
     KeyUp,
     PointerMove,
     PointerWheel,
+    TextInput,
     FocusGained,
     FocusLost
 };
@@ -144,6 +147,7 @@ struct FInputEvent
     std::int32_t DeltaX = 0;
     std::int32_t DeltaY = 0;
     float WheelDelta = 0.0f;
+    char16_t Character = u'\0';
 };
 
 /**
@@ -162,6 +166,7 @@ public:
     [[nodiscard]] std::int32_t GetPointerDeltaX() const noexcept;
     [[nodiscard]] std::int32_t GetPointerDeltaY() const noexcept;
     [[nodiscard]] float GetWheelDelta() const noexcept;
+    [[nodiscard]] std::span<const char16_t> GetTextInput() const noexcept;
     [[nodiscard]] bool HasPointerPosition() const noexcept;
     [[nodiscard]] bool IsWindowFocused() const noexcept;
 
@@ -181,6 +186,7 @@ private:
     std::int32_t PointerDeltaX = 0;
     std::int32_t PointerDeltaY = 0;
     float WheelDelta = 0.0f;
+    std::vector<char16_t> TextInput;
     bool bHasPointerPosition = false;
     bool bWindowFocused = false;
 };

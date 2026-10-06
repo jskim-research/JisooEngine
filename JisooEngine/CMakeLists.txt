@@ -106,18 +106,48 @@ file(GLOB_RECURSE JISOO_ENGINE_EDITOR_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/Editor/*.inl"
 )
 
-add_library(JisooEngineEditor STATIC ${JISOO_ENGINE_EDITOR_SOURCES})
+set(JISOO_IMGUI_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/ImGui/imgui.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/ImGui/imgui_draw.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/ImGui/imgui_tables.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/ImGui/imgui_widgets.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/ImGui/backends/imgui_impl_dx12.cpp"
+)
+set(JISOO_IMGUI_HEADERS
+    "${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/ImGui/LICENSE.txt"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/ImGui/imconfig.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/ImGui/imgui.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/ImGui/imgui_internal.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/ImGui/imstb_rectpack.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/ImGui/imstb_textedit.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/ImGui/imstb_truetype.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/ImGui/backends/imgui_impl_dx12.h"
+)
+
+add_library(JisooEngineEditor STATIC
+    ${JISOO_ENGINE_EDITOR_SOURCES}
+    ${JISOO_IMGUI_SOURCES}
+    ${JISOO_IMGUI_HEADERS}
+)
 add_library(JisooEngine::Editor ALIAS JisooEngineEditor)
 
 target_include_directories(JisooEngineEditor
     PUBLIC
         "${CMAKE_CURRENT_SOURCE_DIR}/Source"
+    PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/ImGui"
+        "${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/ImGui/backends"
 )
 
 target_link_libraries(JisooEngineEditor
     PUBLIC
         JisooEngine::Runtime
+    PRIVATE
+        d3d12
+        d3dcompiler
 )
+
+set_source_files_properties(${JISOO_IMGUI_SOURCES} PROPERTIES COMPILE_OPTIONS "/W0")
 
 jisoo_configure_target(JisooEngineEditor "${CMAKE_CURRENT_SOURCE_DIR}")
 
@@ -126,6 +156,8 @@ source_group(
     PREFIX "Source"
     FILES ${JISOO_ENGINE_EDITOR_SOURCES}
 )
+
+source_group("ThirdParty/ImGui" FILES ${JISOO_IMGUI_SOURCES} ${JISOO_IMGUI_HEADERS})
 
 set_property(
     TARGET JisooEngineRuntime JisooEngineEditor JisooEngineReflectionCode

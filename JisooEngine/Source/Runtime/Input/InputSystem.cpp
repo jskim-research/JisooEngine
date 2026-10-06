@@ -77,6 +77,13 @@ void FInputSystem::ApplyEvent(FInputFrame& Frame, const FInputEvent& Event)
         }
         break;
 
+    case EInputEventType::TextInput:
+        if (Frame.bWindowFocused && Event.Character != u'\0')
+        {
+            Frame.TextInput.push_back(Event.Character);
+        }
+        break;
+
     case EInputEventType::FocusGained:
         Frame.bWindowFocused = true;
         break;
@@ -86,6 +93,7 @@ void FInputSystem::ApplyEvent(FInputFrame& Frame, const FInputEvent& Event)
         Frame.PointerDeltaX = 0;
         Frame.PointerDeltaY = 0;
         Frame.WheelDelta = 0.0f;
+        Frame.TextInput.clear();
         Frame.bHasPointerPosition = false;
         for (std::size_t Index = 0; Index < InputKeyCount; ++Index)
         {

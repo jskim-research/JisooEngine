@@ -51,11 +51,15 @@ public:
     void Shutdown();
 
     [[nodiscard]] std::vector<FViewport*> GetVisibleViewports() const;
+    /** 소유한 Slot의 Viewport만 활성 대상으로 지정할 수 있다. */
+    bool SetActiveViewport(FViewport* Viewport) noexcept;
+    [[nodiscard]] FViewport* GetActiveViewport() const noexcept;
     [[nodiscard]] FEditorViewportClient* GetActiveViewportClient() const noexcept;
     [[nodiscard]] std::size_t GetCreatedSlotCount() const noexcept;
     [[nodiscard]] EEditorViewportLayoutMode GetLayoutMode() const noexcept;
 
 private:
     std::array<std::unique_ptr<FEditorViewportSlot>, MaxViewportCount> Slots;
+    FViewport* ActiveViewport = nullptr;
     EEditorViewportLayoutMode LayoutMode = EEditorViewportLayoutMode::Single;
 };

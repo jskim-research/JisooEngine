@@ -55,6 +55,8 @@ PrimitiveComponent와 FScene 사이의 Proxy 동기화 및 Scene Handle 수명�
 | `RenderScene.InvalidHandleCannotUpdateOrRemove` | 만료된 Handle을 통한 갱신과 중복 제거가 Scene 상태를 변경하지 않도록 보장하기 위해 |
 | `RenderScene.ActorDestroyRemovesProxy` | Actor 직접 파괴 경로에서도 Component Proxy가 Scene에 남지 않도록 보장하기 위해 |
 | `RenderScene.WorldDestroyRemovesProxy` | World 연쇄 파괴가 Scene 소멸 전에 등록된 Proxy를 해제하는지 확인하기 위해 |
+| `RenderScene.TriangleProxySubmitsOpaqueMeshBatch` | Triangle Proxy가 Opaque Pass에서 처리 가능한 Geometry와 Material 정보를 MeshBatch로 제출하는지 확인하기 위해 |
+| `RenderScene.VisibilitySkipsBatchWithoutRemovingProxy` | 보이지 않는 Primitive가 Scene에서 제거되지 않은 채 해당 프레임의 MeshBatch 수집에서만 제외되는지 확인하기 위해 |
 
 ## HeaderGenerator
 

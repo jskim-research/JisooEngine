@@ -2,6 +2,8 @@
 
 #include "Runtime/Core/Math/MathTypes.h"
 
+class FMeshBatchCollector;
+
 struct FPrimitiveSceneDescription
 {
     FMatrix LocalToWorld = FMatrix::Identity();
@@ -47,6 +49,9 @@ public:
     [[nodiscard]] const FBox& GetWorldBounds() const;
     [[nodiscard]] bool IsVisible() const;
     [[nodiscard]] bool CastsShadow() const;
+
+    /** 현재 Proxy가 표현하는 Pass 독립적인 Mesh Draw 후보를 Collector에 제출한다. */
+    virtual void GatherMeshBatches(FMeshBatchCollector& Collector) const;
 
 private:
     void ApplyTransform(const FPrimitiveTransformUpdate& Update);

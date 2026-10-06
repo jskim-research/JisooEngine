@@ -73,7 +73,13 @@ add_dependencies(JisooEngineRuntime JisooEngineReflectionCode)
 target_link_libraries(JisooEngineRuntime
     PRIVATE
         d3d12
+        d3dcompiler
         dxgi
+)
+
+target_compile_definitions(JisooEngineRuntime
+    PRIVATE
+        JISOO_ENGINE_SHADER_DIRECTORY=L"${CMAKE_CURRENT_SOURCE_DIR}/Shaders"
 )
 
 target_include_directories(JisooEngineRuntime

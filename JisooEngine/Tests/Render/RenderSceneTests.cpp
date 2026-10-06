@@ -5,7 +5,11 @@
 #include "Runtime/Engine/Actor.h"
 #include "Runtime/Engine/Components/PrimitiveComponent.h"
 #include "Runtime/Engine/Components/SceneComponent.h"
+#include "Runtime/Engine/Components/TriangleComponent.h"
 #include "Runtime/Engine/World.h"
+#include "Runtime/Render/Mesh/MeshBatch.h"
+#include "Runtime/Render/Mesh/MeshBatchCollection.h"
+#include "Runtime/Render/Mesh/MeshPass.h"
 #include "Runtime/Render/Scene/PrimitiveSceneProxy.h"
 #include "Runtime/Render/Scene/Scene.h"
 
@@ -40,6 +44,53 @@ namespace
 
 void RegisterRenderSceneTests(FTestRunner& Runner)
 {
+    Runner.Add(
+        "RenderScene.TriangleProxySubmitsOpaqueMeshBatch",
+        [](FTestContext& Test)
+        {
+            UWorld* World = NewObject<UWorld>(nullptr, "TriangleBatchWorld");
+            AActor* Actor = World->SpawnActor<AActor>("Actor");
+            UTriangleComponent* Triangle =
+                Actor->AddComponent<UTriangleComponent>("Triangle");
+
+            FTransform Transform;
+            Transform.Translation = {300.0f, 0.0f, 0.0f};
+            Triangle->SetRelativeTransform(Transform);
+
+            FMeshBatchCollector Collector;
+            GatherVisibleMeshBatches(*World->GetScene(), Collector);
+
+            Test.Expect(Collector.Num() == 1, "Visible Triangle Proxy가 MeshBatch 하나를 제출해야 한다.");
+            if (Collector.Num() == 1)
+            {
+                const FMeshBatch& MeshBatch = Collector.GetMeshBatches().front();
+                const FMeshPassMask PassMask = ComputeMeshPassMask(MeshBatch);
+                Test.Expect(MeshBatch.Vertices.size() == 3, "Triangle MeshBatch가 정점 세 개를 참조해야 한다.");
+                Test.Expect(NearlyEqual(MeshBatch.LocalToWorld.M[3][0], 300.0f), "MeshBatch가 Proxy의 World Transform을 복사해야 한다.");
+                Test.Expect(PassMask.Contains(EMeshPass::Opaque), "Opaque Material Batch가 Opaque Pass 후보여야 한다.");
+            }
+
+            DestroyTestWorld(World);
+        });
+
+    Runner.Add(
+        "RenderScene.VisibilitySkipsBatchWithoutRemovingProxy",
+        [](FTestContext& Test)
+        {
+            UWorld* World = NewObject<UWorld>(nullptr, "TriangleVisibilityWorld");
+            AActor* Actor = World->SpawnActor<AActor>("Actor");
+            UTriangleComponent* Triangle =
+                Actor->AddComponent<UTriangleComponent>("Triangle");
+            Triangle->SetVisibility(false);
+
+            FMeshBatchCollector Collector;
+            GatherVisibleMeshBatches(*World->GetScene(), Collector);
+
+            Test.Expect(Collector.Num() == 0, "Invisible Proxy는 이번 프레임의 MeshBatch를 제출하면 안 된다.");
+            Test.Expect(World->GetScene()->GetPrimitiveCount() == 1, "Visibility Culling이 Proxy를 Scene에서 제거하면 안 된다.");
+            DestroyTestWorld(World);
+        });
+
     Runner.Add(
         "RenderScene.RegistersPrimitiveProxy",
         [](FTestContext& Test)

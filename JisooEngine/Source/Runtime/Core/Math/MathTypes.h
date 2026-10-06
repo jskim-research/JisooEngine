@@ -32,6 +32,20 @@ struct FVector
     }
 };
 
+struct FLinearColor
+{
+    float R = 0.0f;
+    float G = 0.0f;
+    float B = 0.0f;
+    float A = 1.0f;
+
+    constexpr FLinearColor() = default;
+    constexpr FLinearColor(float InR, float InG, float InB, float InA = 1.0f)
+        : R(InR), G(InG), B(InB), A(InA)
+    {
+    }
+};
+
 struct FQuat
 {
     float X = 0.0f;

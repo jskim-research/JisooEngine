@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Runtime/Render/D3D12/D3D12UploadBuffer.h"
+
 #include <d3d12.h>
 #include <wrl/client.h>
 
@@ -22,10 +24,15 @@ public:
     void Shutdown();
 
     ID3D12CommandAllocator* GetCommandAllocator() const noexcept;
+    FD3D12UploadBuffer& GetDynamicUploadBuffer();
     std::uint64_t GetFenceValue() const noexcept;
     void SetFenceValue(std::uint64_t Value) noexcept;
 
+    /** 이전 GPU 사용 완료가 확인된 Frame Slot의 선형 Upload 할당 위치를 되돌린다. */
+    void ResetDynamicUploadBuffer();
+
 private:
     Microsoft::WRL::ComPtr<ID3D12CommandAllocator> CommandAllocator;
+    FD3D12UploadBuffer DynamicUploadBuffer;
     std::uint64_t FenceValue = 0;
 };

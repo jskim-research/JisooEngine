@@ -1,5 +1,7 @@
 #include "Runtime/Render/Scene/PrimitiveSceneProxy.h"
 
+#include "Runtime/Render/Mesh/MeshBatch.h"
+
 FPrimitiveSceneProxy::FPrimitiveSceneProxy(const FPrimitiveSceneDescription& Description)
     : LocalToWorld(Description.LocalToWorld)
     , LocalBounds(Description.LocalBounds)
@@ -34,6 +36,10 @@ bool FPrimitiveSceneProxy::IsVisible() const
 bool FPrimitiveSceneProxy::CastsShadow() const
 {
     return bCastShadow;
+}
+
+void FPrimitiveSceneProxy::GatherMeshBatches(FMeshBatchCollector&) const
+{
 }
 
 void FPrimitiveSceneProxy::ApplyTransform(const FPrimitiveTransformUpdate& Update)

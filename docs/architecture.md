@@ -165,9 +165,11 @@ UWorld                                      FScene
 
 SceneProxy는 원본 Component 접근을 한 단계 감싸는 전달 객체나 성능 캐시로 정의하지 않는다. 책임 경계를 위해 독립된 Render Scene 상태를 보유하며, Component 상태를 다시 읽어야 하는 경우에는 명시적인 값 갱신을 추가한다. 이전 자체엔진처럼 Proxy가 Component 포인터를 보관하고 렌더 경로에서 역참조하는 혼합형은 사용하지 않는다.
 
-현재 `FPrimitiveSceneProxy`는 Transform, Local/World Bounds, Visibility와 Cast Shadow만 보관하는 최소 다형 기반이다. `FScene`은 generation을 검증하는 슬롯으로 Proxy를 소유하고 Transform, Bounds와 Flags payload를 각각 동기 갱신한다. `UWorld`가 자신의 `FScene`을 소유하며 Renderer가 사용할 읽기 전용 Proxy 순회를 제공한다. 실제 Renderer의 Scene Draw 연결은 Geometry·Material render reference와 MeshBatch 표현을 결정할 때 추가한다.
+`FPrimitiveSceneProxy`는 Transform, Local/World Bounds, Visibility와 Cast Shadow를 공통으로 보관하고, 파생 Proxy가 `GatherMeshBatches`에서 Pass 독립적인 `FMeshBatch`를 제출한다. 현재 `FTriangleSceneProxy`는 CPU 정점 세 개와 단색 Opaque Material 입력을 보관한다. Renderer는 Visible Proxy의 Batch를 프레임 로컬 Collector에 모으고 PassMask를 계산한 뒤 `FOpaqueMeshPassProcessor`로 `FMeshDrawCommand`를 생성한다.
 
-Geometry·Material render reference를 어떤 handle로 표현할지, 타입별 Proxy가 Renderer에 MeshBatch 또는 다른 render data를 어떤 인터페이스로 제공할지는 관련 타입을 구현할 때 확정한다. PassProcessor, Render Graph와 RHI는 이 결정의 적용 범위가 아니다.
+현재 Dynamic Geometry는 Proxy가 소유한 CPU 정점의 `std::span`으로 표현하며 Processor가 해당 FrameResource의 선형 Upload Buffer에 복사한다. Upload Buffer는 Frame Slot의 Fence 완료 뒤에만 재사용한다. Static Mesh용 영구 GPU Buffer Handle과 범용 Material render reference는 Static Mesh·Material 구현 시 별도로 확정한다.
+
+Pass Processor는 PSO와 Binding을 선택해 Draw Command를 만들지만 D3D12 CommandList를 직접 기록하지 않는다. Renderer가 Pass 공통 Root Signature와 RenderTarget을 설정하고 정렬된 Command의 변경된 상태를 바인딩해 Draw를 기록한다. 현재는 Opaque Pass, Root Signature와 PSO가 각각 하나이며 PSO Registry, Render Graph와 RHI는 도입하지 않는다.
 
 선택 이유와 검토한 대안은 [Game Scene과 Render Scene 책임 분리 결정](decisions/Game%20Scene과%20Render%20Scene%20책임%20분리%20결정.md)에 기록한다.
 
@@ -217,6 +219,8 @@ JisooGameEditor.exe -> main.cpp -> FEngineLoop.Run(FEditorEngine)
 
 현재 `FEngineLoop`는 최소 Win32 창을 생성하고 메시지를 처리하며 `steady_clock`으로 DeltaSeconds를 계산해, 창을 닫을 때까지 `FEngine::Tick`을 반복 호출한 뒤 종료한다. `FWindowsWindow`는 창과 네이티브 핸들을 소유하지만 범용 Application 계층은 두지 않는다.
 
-`FEngine`은 World Handle 목록과 D3D12 전용 `FRenderer`를 소유한다. 각 `UWorld`는 CPU-side `FScene`을 소유한다. 한 프레임은 World Tick → Renderer Frame → Pending UObject Flush 순서로 처리하므로 현재 Single Thread에서는 World Tick 동안 Scene 갱신을 끝내고 Renderer 구간에는 읽기 전용으로 취급한다. 종료할 때는 World 파괴와 Pending UObject Flush를 먼저 수행한 뒤 Renderer를 종료한다. `FRenderer`는 RHI나 그래픽 API 다형성 계층 없이 `FD3D12Device`, `FD3D12CommandContext`, `FDXGISwapChain`과 프레임별 `FFrameResource`를 합성한다. 현재 렌더링 범위는 BackBuffer 상태 전환, Clear, Present와 Fence 기반 프레임 자원 재사용까지이며, Proxy가 제공할 Geometry·Material 표현이 아직 없어 Scene Draw는 연결하지 않는다.
+`FEngine`은 World Handle 목록과 D3D12 전용 `FRenderer`를 소유한다. 각 `UWorld`는 CPU-side `FScene`을 소유한다. 한 프레임은 World Tick → Renderer Frame → Pending UObject Flush 순서로 처리하므로 현재 Single Thread에서는 World Tick 동안 Scene 갱신을 끝내고 Renderer 구간에는 읽기 전용으로 취급한다. 종료할 때는 World 파괴와 Pending UObject Flush를 먼저 수행한 뒤 Renderer를 종료한다. `FRenderer`는 RHI나 그래픽 API 다형성 계층 없이 `FD3D12Device`, `FD3D12CommandContext`, `FDXGISwapChain`과 프레임별 `FFrameResource`를 합성한다. 현재 렌더링 범위는 BackBuffer 상태 전환, Clear, Visible MeshBatch 수집, 단일 Opaque Pass의 Draw Command 생성·기록, Present와 Fence 기반 프레임 자원 재사용까지다.
+
+첫 수직 검증에서는 고정 View·Projection과 `UTriangleComponent`를 사용한다. Frustum이 아직 없으므로 Primitive Visibility는 `IsVisible()`만 검사하고, 앞면 winding이 확정되지 않아 Opaque PSO의 Cull Mode는 None이다. 기본 World에 생성하는 `RenderValidationTriangle`은 Game 시작 Scene 연결 전까지 실제 실행 경로를 검증하기 위한 임시 콘텐츠다.
 
 에디터 화면, 편집·플레이 월드 전환, 게임 콘텐츠 로딩·패키징은 아직 구현되지 않았다.

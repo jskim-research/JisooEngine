@@ -8,6 +8,8 @@
 #include <array>
 #include <cstdint>
 
+class FScene;
+
 /**
  * D3D12 렌더링 하위 객체의 생애주기와 프레임 기록·제출 순서를 조정한다.
  * 현재는 BackBuffer Clear와 Present, FrameResource 재사용 동기화까지 담당한다.
@@ -30,8 +32,8 @@ public:
         std::uint32_t Width,
         std::uint32_t Height);
 
-    /** 현재 BackBuffer를 지우고 화면에 표시한 뒤 FrameResource 완료 지점을 기록한다. */
-    void RenderFrame();
+    /** Scene의 Visible Mesh를 그린 뒤 현재 BackBuffer를 표시하고 FrameResource 완료 지점을 기록한다. */
+    void RenderFrame(const FScene* Scene);
 
     /**
      * 제출된 GPU 작업을 완료한 뒤 SwapChain BackBuffer를 새 크기로 다시 생성한다.
@@ -42,9 +44,17 @@ public:
     /** 제출된 GPU 작업을 완료한 뒤 렌더링 자원을 의존 관계의 역순으로 해제한다. */
     void Shutdown();
 
+private:
+    bool InitializeOpaquePass();
+    void ShutdownOpaquePass();
+
     FD3D12Device Device;
     FD3D12CommandContext CommandContext;
     FDXGISwapChain SwapChain;
     std::array<FFrameResource, FDXGISwapChain::BufferCount> FrameResources;
+    Microsoft::WRL::ComPtr<ID3D12RootSignature> OpaqueRootSignature;
+    Microsoft::WRL::ComPtr<ID3D12PipelineState> OpaquePipelineState;
+    std::uint32_t ViewportWidth = 0;
+    std::uint32_t ViewportHeight = 0;
     bool bInitialized = false;
 };

@@ -63,3 +63,18 @@
 - [ ] Primitive 수와 갱신량이 커지면 선형 슬롯 순회, 단건 동기 update를 SceneInfo·공간 인덱스·batch update로 확장한다.
 - [ ] Geometry·Material render reference와 Renderer 자원 수명·Fence 연동을 구현한다.
 - [ ] Render Thread와 비동기 update command queue는 Single Thread 구조가 실제 병목이 된 뒤 검토한다.
+
+## Mesh 제출과 GPU 자원
+
+- [ ] `FLinearColor`의 색 공간 변환 계약을 완성한다.
+  - 입력 색상의 sRGB 여부를 리소스·API 경계에서 명시하고, 필요한 입력은 Linear로 변환한다.
+  - 조명과 혼합은 Linear 공간에서 수행하고, 최종 출력 경계에서 sRGB 변환을 적용한다.
+- [ ] Dynamic Upload Buffer를 고정 단일 용량에서 프레임별 페이지 기반 선형 할당기로 확장한다.
+  - 각 요청은 현재 페이지에서 필요한 크기와 정렬만큼 sub-allocation한다.
+  - 남은 공간이 부족하면 새 페이지를 사용하고, 기본 페이지보다 큰 단일 요청은 전용 대형 페이지로 처리한다.
+  - Frame Fence 완료 전에는 페이지를 재사용하지 않으며, 할당 실패를 Draw 누락으로 숨기지 않고 진단한다.
+- [ ] Opaque `FMeshDrawCommand::SortKey`를 안정적인 `PSO → Material Binding → Mesh` 순서로 구성한다.
+  - 포인터 주소가 아닌 Registry ID나 명시적인 안정 ID를 사용하고, 서로 다른 Material의 여러 Draw에서 상태 변경이 줄어드는지 검증한다.
+- [ ] 두 번째 Mesh Pass를 추가하기 전에 Pass 초기화와 종료 책임을 Renderer에서 분리한다.
+  - 공용 Shader Library, Root Signature Cache와 Pipeline State Cache를 한 번 초기화·종료하고 Pass Processor는 필요한 상태를 Key로 요청하는 구조를 검토한다.
+  - Pass마다 `InitializeXxxPass`와 `ShutdownXxxPass`가 Renderer에 누적되지 않게 한다.

@@ -86,6 +86,7 @@ bool FD3D12CommandContext::BeginFrame(FFrameResource& FrameResource)
         return false;
     }
 
+    FrameResource.ResetDynamicUploadBuffer();
     return true;
 }
 

@@ -1,0 +1,29 @@
+#pragma once
+
+#include "Runtime/Core/Math/MathTypes.h"
+#include "Runtime/Render/Mesh/MeshDrawCommand.h"
+
+#include <vector>
+
+class FFrameResource;
+struct FMeshBatch;
+
+/** Opaque MeshBatch를 현재 Frame의 D3D12 실행 상태로 변환한다. */
+class FOpaqueMeshPassProcessor
+{
+public:
+    FOpaqueMeshPassProcessor(
+        ID3D12PipelineState* InPipelineState,
+        FFrameResource& InFrameResource,
+        const FMatrix& InViewProjection);
+
+    /** 처리 가능한 Batch이면 정점을 FrameResource에 업로드하고 DrawCommand를 추가한다. */
+    bool AddMeshBatch(
+        const FMeshBatch& MeshBatch,
+        std::vector<FMeshDrawCommand>& DrawCommands) const;
+
+private:
+    ID3D12PipelineState* PipelineState = nullptr;
+    FFrameResource& FrameResource;
+    FMatrix ViewProjection = FMatrix::Identity();
+};

@@ -1,6 +1,8 @@
 #include "Runtime/Engine/Engine.h"
 
 #include "Runtime/CoreUObject/ObjectGlobals.h"
+#include "Runtime/Engine/Actor.h"
+#include "Runtime/Engine/Components/TriangleComponent.h"
 #include "Runtime/Engine/World.h"
 #include "Runtime/Render/Renderer.h"
 
@@ -43,23 +45,52 @@ bool FEngine::Initialize(const FEngineInitParams& InitParams)
     {
         World->BeginPlay();
     }
+
+    const std::vector<UWorld*> ActiveWorlds = GetWorlds();
+    if (!ActiveWorlds.empty())
+    {
+        AActor* TriangleActor = ActiveWorlds.front()->SpawnActor<AActor>(
+            "RenderValidationTriangle");
+        if (TriangleActor == nullptr)
+        {
+            Shutdown();
+            return false;
+        }
+
+        UTriangleComponent* TriangleComponent =
+            TriangleActor->AddComponent<UTriangleComponent>("Triangle");
+        if (TriangleComponent == nullptr)
+        {
+            Shutdown();
+            return false;
+        }
+
+        FTransform TriangleTransform;
+        TriangleTransform.Translation = {300.0f, 0.0f, 0.0f};
+        TriangleComponent->SetRelativeTransform(TriangleTransform);
+    }
     return true;
 }
 
 void FEngine::Tick(float DeltaSeconds)
 {
     const std::vector<FObjectHandle> WorldSnapshot = Worlds;
+    const FScene* RenderScene = nullptr;
     for (const FObjectHandle Handle : WorldSnapshot)
     {
         if (UWorld* World = Cast<UWorld>(ResolveObject(Handle)))
         {
             World->Tick(DeltaSeconds);
+            if (RenderScene == nullptr)
+            {
+                RenderScene = World->GetScene();
+            }
         }
     }
 
     if (Renderer != nullptr)
     {
-        Renderer->RenderFrame();
+        Renderer->RenderFrame(RenderScene);
     }
 
     FlushPendingDestroyObjects();

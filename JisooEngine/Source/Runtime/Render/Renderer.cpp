@@ -1,40 +1,8 @@
 #include "Runtime/Render/Renderer.h"
 
-#include "Runtime/Core/Math/MathTypes.h"
+#include "Runtime/Engine/Viewport/SceneView.h"
 #include "Runtime/Render/Mesh/MeshBatchCollection.h"
 #include "Runtime/Render/Scene/Scene.h"
-
-#include <cmath>
-#include <numbers>
-
-namespace
-{
-    FMatrix MakeFixedViewProjection(std::uint32_t Width, std::uint32_t Height)
-    {
-        FMatrix View{};
-        View.M[0][2] = 1.0f;
-        View.M[1][0] = 1.0f;
-        View.M[2][1] = 1.0f;
-        View.M[3][3] = 1.0f;
-
-        constexpr float FieldOfViewDegrees = 60.0f;
-        constexpr float NearPlane = 1.0f;
-        constexpr float FarPlane = 100000.0f;
-        const float AspectRatio = static_cast<float>(Width) / static_cast<float>(Height);
-        const float FieldOfViewRadians =
-            FieldOfViewDegrees * std::numbers::pi_v<float> / 180.0f;
-        const float YScale = 1.0f / std::tan(FieldOfViewRadians * 0.5f);
-        const float XScale = YScale / AspectRatio;
-
-        FMatrix Projection{};
-        Projection.M[0][0] = XScale;
-        Projection.M[1][1] = YScale;
-        Projection.M[2][2] = FarPlane / (FarPlane - NearPlane);
-        Projection.M[2][3] = 1.0f;
-        Projection.M[3][2] = -NearPlane * FarPlane / (FarPlane - NearPlane);
-        return View * Projection;
-    }
-}
 
 FRenderer::~FRenderer()
 {
@@ -86,81 +54,141 @@ bool FRenderer::Initialize(
         return false;
     }
 
-    ViewportWidth = Width;
-    ViewportHeight = Height;
+    MainRenderTargetHandle = RegisterRenderTarget(
+        Width,
+        Height,
+        D3D12_RESOURCE_STATE_PRESENT);
+    if (!MainRenderTargetHandle.IsSet())
+    {
+        Shutdown();
+        return false;
+    }
+
     bInitialized = true;
     return true;
 }
 
-void FRenderer::RenderFrame(const FScene* Scene)
+FRenderTargetHandle FRenderer::GetMainRenderTargetHandle() const noexcept
 {
-    if (!bInitialized)
+    return MainRenderTargetHandle;
+}
+
+bool FRenderer::BeginFrame()
+{
+    if (!bInitialized || ActiveFrameResource != nullptr)
     {
-        return;
+        return false;
+    }
+
+    FRenderTargetSlot* MainTarget = ResolveRenderTarget(MainRenderTargetHandle);
+    if (MainTarget == nullptr)
+    {
+        return false;
     }
 
     const std::uint32_t FrameIndex = SwapChain.GetCurrentBackBufferIndex();
     FFrameResource& FrameResource = FrameResources[FrameIndex];
     if (!CommandContext.BeginFrame(FrameResource))
     {
+        return false;
+    }
+
+    for (FRenderTargetSlot& Target : RenderTargetSlots)
+    {
+        Target.bUsedThisFrame = false;
+    }
+
+    MainTarget->Resource = SwapChain.GetCurrentBackBuffer();
+    MainTarget->RenderTargetView = SwapChain.GetCurrentRenderTargetView();
+    MainTarget->CurrentState = D3D12_RESOURCE_STATE_PRESENT;
+    ActiveFrameResource = &FrameResource;
+    return true;
+}
+
+void FRenderer::RenderViewFamily(const FSceneViewFamily& ViewFamily)
+{
+    if (ActiveFrameResource == nullptr || ViewFamily.Scene == nullptr)
+    {
+        return;
+    }
+
+    FRenderTargetSlot* Target = ResolveRenderTarget(ViewFamily.Output.Target);
+    if (Target == nullptr || ViewFamily.Output.Width == 0 ||
+        ViewFamily.Output.Height == 0 || ViewFamily.Output.Width > Target->Width ||
+        ViewFamily.Output.Height > Target->Height || !PrepareRenderTarget(*Target))
+    {
         return;
     }
 
     ID3D12GraphicsCommandList* CommandList = CommandContext.GetCommandList();
-    ID3D12Resource* BackBuffer = SwapChain.GetCurrentBackBuffer();
-    const D3D12_CPU_DESCRIPTOR_HANDLE RenderTargetView =
-        SwapChain.GetCurrentRenderTargetView();
-
-    CommandContext.TransitionResource(
-        BackBuffer,
-        D3D12_RESOURCE_STATE_PRESENT,
-        D3D12_RESOURCE_STATE_RENDER_TARGET);
-
-    constexpr float ClearColor[] = {0.035f, 0.055f, 0.085f, 1.0f};
-    CommandList->ClearRenderTargetView(RenderTargetView, ClearColor, 0, nullptr);
-
-    if (Scene != nullptr)
+    for (const FSceneView& View : ViewFamily.Views)
     {
-        FMeshBatchCollector Collector;
-        GatherVisibleMeshBatches(*Scene, Collector);
+        if (View.ViewRect.Width == 0 || View.ViewRect.Height == 0 ||
+            View.ViewRect.X > ViewFamily.Output.Width ||
+            View.ViewRect.Y > ViewFamily.Output.Height ||
+            View.ViewRect.Width > ViewFamily.Output.Width - View.ViewRect.X ||
+            View.ViewRect.Height > ViewFamily.Output.Height - View.ViewRect.Y)
+        {
+            continue;
+        }
 
-        const FMatrix ViewProjection = MakeFixedViewProjection(
-            ViewportWidth,
-            ViewportHeight);
+        FMeshBatchCollector Collector;
+        GatherVisibleMeshBatches(*ViewFamily.Scene, Collector);
 
         MeshPassPipeline.Execute(
             Collector,
             {
                 *CommandList,
-                FrameResource,
-                RenderTargetView,
-                ViewportWidth,
-                ViewportHeight,
-                ViewProjection
+                *ActiveFrameResource,
+                Target->RenderTargetView,
+                View.ViewRect.X,
+                View.ViewRect.Y,
+                View.ViewRect.Width,
+                View.ViewRect.Height,
+                View.GetViewProjectionMatrix()
             });
     }
+}
 
-    CommandContext.TransitionResource(
-        BackBuffer,
-        D3D12_RESOURCE_STATE_RENDER_TARGET,
-        D3D12_RESOURCE_STATE_PRESENT);
+bool FRenderer::EndFrame()
+{
+    if (ActiveFrameResource == nullptr)
+    {
+        return false;
+    }
+
+    for (FRenderTargetSlot& Target : RenderTargetSlots)
+    {
+        if (!Target.bUsedThisFrame || Target.Resource == nullptr)
+        {
+            continue;
+        }
+
+        if (Target.CurrentState != Target.FinalState)
+        {
+            CommandContext.TransitionResource(
+                Target.Resource,
+                Target.CurrentState,
+                Target.FinalState);
+            Target.CurrentState = Target.FinalState;
+        }
+    }
 
     if (!CommandContext.ExecuteCommandList())
     {
-        return;
+        ActiveFrameResource = nullptr;
+        return false;
     }
 
     const bool bPresented = SwapChain.Present();
-    const bool bSignaled = CommandContext.Signal(FrameResource);
-    if (!bPresented || !bSignaled)
-    {
-        return;
-    }
+    const bool bSignaled = CommandContext.Signal(*ActiveFrameResource);
+    ActiveFrameResource = nullptr;
+    return bPresented && bSignaled;
 }
 
 bool FRenderer::Resize(std::uint32_t Width, std::uint32_t Height)
 {
-    if (!bInitialized || Width == 0 || Height == 0)
+    if (!bInitialized || ActiveFrameResource != nullptr || Width == 0 || Height == 0)
     {
         return false;
     }
@@ -181,8 +209,18 @@ bool FRenderer::Resize(std::uint32_t Width, std::uint32_t Height)
         return false;
     }
 
-    ViewportWidth = Width;
-    ViewportHeight = Height;
+    FRenderTargetSlot* MainTarget = ResolveRenderTarget(MainRenderTargetHandle);
+    if (MainTarget == nullptr)
+    {
+        return false;
+    }
+
+    MainTarget->Resource = nullptr;
+    MainTarget->RenderTargetView = {};
+    MainTarget->CurrentState = D3D12_RESOURCE_STATE_PRESENT;
+    MainTarget->Width = Width;
+    MainTarget->Height = Height;
+    MainTarget->bUsedThisFrame = false;
     return true;
 }
 
@@ -192,6 +230,8 @@ void FRenderer::Shutdown()
     CommandContext.WaitForGpu();
 
     MeshPassPipeline.Shutdown();
+    RenderTargetSlots.clear();
+    MainRenderTargetHandle = {};
     SwapChain.Shutdown();
     CommandContext.Shutdown();
     for (FFrameResource& FrameResource : FrameResources)
@@ -200,7 +240,85 @@ void FRenderer::Shutdown()
     }
     Device.Shutdown();
 
-    ViewportWidth = 0;
-    ViewportHeight = 0;
+    ActiveFrameResource = nullptr;
     bInitialized = false;
+}
+
+FRenderTargetHandle FRenderer::RegisterRenderTarget(
+    std::uint32_t Width,
+    std::uint32_t Height,
+    D3D12_RESOURCE_STATES FinalState)
+{
+    if (Width == 0 || Height == 0 ||
+        RenderTargetSlots.size() >= FRenderTargetHandle::InvalidIndex)
+    {
+        return {};
+    }
+
+    ++NextRenderTargetGeneration;
+    if (NextRenderTargetGeneration == 0)
+    {
+        ++NextRenderTargetGeneration;
+    }
+
+    const std::uint32_t SlotIndex =
+        static_cast<std::uint32_t>(RenderTargetSlots.size());
+    FRenderTargetSlot& Slot = RenderTargetSlots.emplace_back();
+    Slot.CurrentState = FinalState;
+    Slot.FinalState = FinalState;
+    Slot.Width = Width;
+    Slot.Height = Height;
+    Slot.Generation = NextRenderTargetGeneration;
+    Slot.bAllocated = true;
+    return {SlotIndex, Slot.Generation};
+}
+
+FRenderer::FRenderTargetSlot* FRenderer::ResolveRenderTarget(
+    FRenderTargetHandle Handle)
+{
+    return const_cast<FRenderTargetSlot*>(
+        static_cast<const FRenderer*>(this)->ResolveRenderTarget(Handle));
+}
+
+const FRenderer::FRenderTargetSlot* FRenderer::ResolveRenderTarget(
+    FRenderTargetHandle Handle) const
+{
+    if (!Handle.IsSet() || Handle.Index >= RenderTargetSlots.size())
+    {
+        return nullptr;
+    }
+
+    const FRenderTargetSlot& Slot = RenderTargetSlots[Handle.Index];
+    return Slot.bAllocated && Slot.Generation == Handle.Generation ? &Slot : nullptr;
+}
+
+bool FRenderer::PrepareRenderTarget(FRenderTargetSlot& Target)
+{
+    if (Target.Resource == nullptr || Target.RenderTargetView.ptr == 0)
+    {
+        return false;
+    }
+
+    if (Target.bUsedThisFrame)
+    {
+        return true;
+    }
+
+    if (Target.CurrentState != D3D12_RESOURCE_STATE_RENDER_TARGET)
+    {
+        CommandContext.TransitionResource(
+            Target.Resource,
+            Target.CurrentState,
+            D3D12_RESOURCE_STATE_RENDER_TARGET);
+        Target.CurrentState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+    }
+
+    constexpr float ClearColor[] = {0.035f, 0.055f, 0.085f, 1.0f};
+    CommandContext.GetCommandList()->ClearRenderTargetView(
+        Target.RenderTargetView,
+        ClearColor,
+        0,
+        nullptr);
+    Target.bUsedThisFrame = true;
+    return true;
 }

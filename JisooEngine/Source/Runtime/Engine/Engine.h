@@ -51,6 +51,12 @@ public:
 
     [[nodiscard]] std::vector<UWorld*> GetWorlds() const;
 
+protected:
+    /** World Tick 이후 구체 Engine이 Viewport 렌더 요청을 제출하는 프레임 단계다. */
+    virtual void RenderFrame();
+
+    [[nodiscard]] FRenderer* GetRenderer() const noexcept;
+
 private:
     std::unique_ptr<FRenderer> Renderer;
     std::vector<FObjectHandle> Worlds;

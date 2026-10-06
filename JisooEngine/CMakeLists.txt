@@ -203,13 +203,19 @@ if(BUILD_TESTING)
             "${CMAKE_CURRENT_SOURCE_DIR}/Tests"
             "${JISOO_TEST_GENERATED_ROOT}"
     )
-    target_link_libraries(JisooEngineTests PRIVATE JisooEngine::Runtime)
+    target_link_libraries(
+        JisooEngineTests
+        PRIVATE
+            JisooEngine::Runtime
+            JisooEngine::Editor
+    )
     jisoo_configure_target(JisooEngineTests "${CMAKE_CURRENT_SOURCE_DIR}")
 
     add_test(NAME Jisoo.CoreUObject COMMAND JisooEngineTests --suite CoreUObject)
     add_test(NAME Jisoo.EngineLifecycle COMMAND JisooEngineTests --suite EngineLifecycle)
     add_test(NAME Jisoo.SceneComponent COMMAND JisooEngineTests --suite SceneComponent)
     add_test(NAME Jisoo.RenderScene COMMAND JisooEngineTests --suite RenderScene)
+    add_test(NAME Jisoo.Viewport COMMAND JisooEngineTests --suite Viewport)
     add_test(
         NAME JisooHeaderGenerator
         COMMAND "${Python3_EXECUTABLE}" "${JISOO_HEADER_GENERATOR}" --self-test

@@ -75,23 +75,15 @@ bool FEngine::Initialize(const FEngineInitParams& InitParams)
 void FEngine::Tick(float DeltaSeconds)
 {
     const std::vector<FObjectHandle> WorldSnapshot = Worlds;
-    const FScene* RenderScene = nullptr;
     for (const FObjectHandle Handle : WorldSnapshot)
     {
         if (UWorld* World = Cast<UWorld>(ResolveObject(Handle)))
         {
             World->Tick(DeltaSeconds);
-            if (RenderScene == nullptr)
-            {
-                RenderScene = World->GetScene();
-            }
         }
     }
 
-    if (Renderer != nullptr)
-    {
-        Renderer->RenderFrame(RenderScene);
-    }
+    RenderFrame();
 
     FlushPendingDestroyObjects();
 }
@@ -162,4 +154,13 @@ std::vector<UWorld*> FEngine::GetWorlds() const
         }
     }
     return Result;
+}
+
+void FEngine::RenderFrame()
+{
+}
+
+FRenderer* FEngine::GetRenderer() const noexcept
+{
+    return Renderer.get();
 }

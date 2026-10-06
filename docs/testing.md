@@ -66,3 +66,14 @@ UObject 메타데이터 생성기가 지원하는 선언을 생성하고 지원�
 | 검증 항목 | 이유 |
 |---|---|
 | `JisooHeaderGenerator` | Class 메타데이터와 생성자 전달 코드를 생성하고 templated `UCLASS`를 명시적으로 거부하는지 확인하기 위해 |
+
+## Viewport
+
+Viewport 출력 표면, Client 호출 경계와 Editor Layout의 초기 확장 계약을 검증한다.
+
+| 검증 항목 | 이유 |
+|---|---|
+| `Viewport.DrawForwardsToAssociatedClient` | FViewport가 렌더 정책을 소유하지 않고 연결된 Client의 Draw 진입점을 정확히 호출하는지 확인하기 위해 |
+| `Viewport.SceneViewFamilyOwnsFrameViews` | Renderer 요청이 Scene, RenderTarget Handle과 프레임별 SceneView 목록을 값으로 함께 보관하는지 확인하기 위해 |
+| `Viewport.RejectsMissingRenderTarget` | 유효한 Target Handle이 없는 Viewport가 암묵적인 기본 BackBuffer로 렌더되지 않도록 보장하기 위해 |
+| `Viewport.EditorLayoutStartsWithSingleVisibleSlot` | 초기에는 Slot 0만 생성하면서 최대 네 Slot의 Layout 구조와 Single 표시 계약을 유지하는지 확인하기 위해 |

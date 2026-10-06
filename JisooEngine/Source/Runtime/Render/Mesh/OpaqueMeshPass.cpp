@@ -217,6 +217,8 @@ void FOpaqueMeshPass::BindPassState(
         nullptr);
 
     D3D12_VIEWPORT Viewport{};
+    Viewport.TopLeftX = static_cast<float>(Context.ViewportX);
+    Viewport.TopLeftY = static_cast<float>(Context.ViewportY);
     Viewport.Width = static_cast<float>(Context.ViewportWidth);
     Viewport.Height = static_cast<float>(Context.ViewportHeight);
     Viewport.MinDepth = 0.0f;
@@ -224,8 +226,10 @@ void FOpaqueMeshPass::BindPassState(
     Context.CommandList.RSSetViewports(1, &Viewport);
 
     D3D12_RECT ScissorRect{};
-    ScissorRect.right = static_cast<LONG>(Context.ViewportWidth);
-    ScissorRect.bottom = static_cast<LONG>(Context.ViewportHeight);
+    ScissorRect.left = static_cast<LONG>(Context.ViewportX);
+    ScissorRect.top = static_cast<LONG>(Context.ViewportY);
+    ScissorRect.right = static_cast<LONG>(Context.ViewportX + Context.ViewportWidth);
+    ScissorRect.bottom = static_cast<LONG>(Context.ViewportY + Context.ViewportHeight);
     Context.CommandList.RSSetScissorRects(1, &ScissorRect);
     Context.CommandList.SetGraphicsRootSignature(RootSignature.Get());
 }

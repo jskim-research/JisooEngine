@@ -92,6 +92,8 @@ void FMeshPassPipeline::Execute(
         Context.CommandList,
         Context.FrameResource,
         Context.RenderTargetView,
+        Context.ViewportX,
+        Context.ViewportY,
         Context.ViewportWidth,
         Context.ViewportHeight,
         Context.ViewProjection,

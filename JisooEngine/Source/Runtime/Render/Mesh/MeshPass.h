@@ -68,6 +68,8 @@ struct FMeshPassExecutionContext
     ID3D12GraphicsCommandList& CommandList;
     FFrameResource& FrameResource;
     D3D12_CPU_DESCRIPTOR_HANDLE RenderTargetView{};
+    std::uint32_t ViewportX = 0;
+    std::uint32_t ViewportY = 0;
     std::uint32_t ViewportWidth = 0;
     std::uint32_t ViewportHeight = 0;
     FMatrix ViewProjection = FMatrix::Identity();

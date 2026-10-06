@@ -75,6 +75,12 @@
   - Frame Fence 완료 전에는 페이지를 재사용하지 않으며, 할당 실패를 Draw 누락으로 숨기지 않고 진단한다.
 - [ ] Opaque `FMeshDrawCommand::SortKey`를 안정적인 `PSO → Material Binding → Mesh` 순서로 구성한다.
   - 포인터 주소가 아닌 Registry ID나 명시적인 안정 ID를 사용하고, 서로 다른 Material의 여러 Draw에서 상태 변경이 줄어드는지 검증한다.
-- [ ] 두 번째 Mesh Pass를 추가하기 전에 Pass 초기화와 종료 책임을 Renderer에서 분리한다.
-  - 공용 Shader Library, Root Signature Cache와 Pipeline State Cache를 한 번 초기화·종료하고 Pass Processor는 필요한 상태를 Key로 요청하는 구조를 검토한다.
-  - Pass마다 `InitializeXxxPass`와 `ShutdownXxxPass`가 Renderer에 누적되지 않게 한다.
+- [x] `FMeshPassPipeline`과 `FMeshPass` 계약으로 Pass 초기화·종료·relevance·순차 실행을 Renderer에서 분리한다.
+- [ ] 공용 Shader Library, Root Signature Cache와 Pipeline State Cache를 한 번 초기화·종료하고 Pass가 필요한 상태를 Key로 요청하는 구조를 검토한다.
+- [ ] `FOpaqueMeshPass`의 `DefaultMesh.hlsl` 직접 경로와 직접 컴파일을 Shader Library·Material Shader Map 기반 선택으로 교체한다.
+  - 동적 Material 값과 Texture는 같은 Shader의 Binding으로 처리하고, Static Switch·Vertex Factory·Pass처럼 코드 구조가 달라지는 조건만 제한된 Shader Permutation으로 만든다.
+  - Uber Shader의 Runtime 분기 비용과 Shader Permutation 수 증가 비용을 비교해 기능별 적용 기준을 정한다.
+  - 선택된 Shader, Root Signature, Input Layout, RenderTarget Format과 Rasterizer·Blend·Depth 상태로 PSO(Pipeline State Object) Key를 구성해 Cache에서 조회한다.
+- [ ] Pass 수와 Batch 수가 커지면 현재의 양방향 전체 순회를 수집 시점의 Pass별 Batch 분배로 교체한다.
+- [ ] Shadow·Depth처럼 View와 Primitive 상태가 필요한 Pass를 추가할 때 `IsRelevant` 입력을 Batch 전용에서 View·Primitive relevance context로 확장한다.
+- [ ] Pass마다 Root Parameter와 Descriptor Binding 구성이 달라질 때 Root Constants slot 0을 전제하는 공통 Draw 기록 계약을 확장한다.

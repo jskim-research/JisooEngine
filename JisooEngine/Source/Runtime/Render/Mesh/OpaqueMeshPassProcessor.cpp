@@ -7,17 +7,14 @@
 #include <limits>
 
 FOpaqueMeshPassProcessor::FOpaqueMeshPassProcessor(
-    ID3D12PipelineState* InPipelineState,
-    FFrameResource& InFrameResource,
-    const FMatrix& InViewProjection)
+    ID3D12PipelineState* InPipelineState)
     : PipelineState(InPipelineState)
-    , FrameResource(InFrameResource)
-    , ViewProjection(InViewProjection)
 {
 }
 
 bool FOpaqueMeshPassProcessor::AddMeshBatch(
     const FMeshBatch& MeshBatch,
+    const FMeshPassProcessorContext& Context,
     std::vector<FMeshDrawCommand>& DrawCommands) const
 {
     if (PipelineState == nullptr || MeshBatch.Vertices.empty() ||
@@ -30,7 +27,7 @@ bool FOpaqueMeshPassProcessor::AddMeshBatch(
 
     const std::size_t VertexDataSize = MeshBatch.Vertices.size_bytes();
     const FD3D12UploadAllocation VertexAllocation =
-        FrameResource.GetDynamicUploadBuffer().Allocate(
+        Context.FrameResource.GetDynamicUploadBuffer().Allocate(
             VertexDataSize,
             alignof(FMeshVertex));
     if (!VertexAllocation.IsValid() ||
@@ -51,7 +48,7 @@ bool FOpaqueMeshPassProcessor::AddMeshBatch(
     DrawCommand.VertexBufferView.StrideInBytes = sizeof(FMeshVertex);
     DrawCommand.PrimitiveTopology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
     DrawCommand.Constants.WorldViewProjection =
-        MeshBatch.LocalToWorld * ViewProjection;
+        MeshBatch.LocalToWorld * Context.ViewProjection;
     DrawCommand.Constants.BaseColor = MeshBatch.Material.BaseColor;
     DrawCommand.VertexCount = static_cast<std::uint32_t>(MeshBatch.Vertices.size());
     DrawCommands.push_back(DrawCommand);

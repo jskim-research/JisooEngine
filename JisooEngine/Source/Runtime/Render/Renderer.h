@@ -4,6 +4,7 @@
 #include "Runtime/Render/D3D12/D3D12Device.h"
 #include "Runtime/Render/D3D12/DXGISwapChain.h"
 #include "Runtime/Render/D3D12/FrameResource.h"
+#include "Runtime/Render/Mesh/MeshPassPipeline.h"
 
 #include <array>
 #include <cstdint>
@@ -11,8 +12,8 @@
 class FScene;
 
 /**
- * D3D12 렌더링 하위 객체의 생애주기와 프레임 기록·제출 순서를 조정한다.
- * 현재는 BackBuffer Clear와 Present, FrameResource 재사용 동기화까지 담당한다.
+ * D3D12 렌더링 하위 객체와 MeshPassPipeline의 생애주기 및 프레임 제출 순서를 조정한다.
+ * 구체 Mesh Pass 정책은 소유하지 않고 BackBuffer와 FrameResource 재사용을 관리한다.
  */
 class FRenderer
 {
@@ -45,15 +46,11 @@ public:
     void Shutdown();
 
 private:
-    bool InitializeOpaquePass();
-    void ShutdownOpaquePass();
-
     FD3D12Device Device;
     FD3D12CommandContext CommandContext;
     FDXGISwapChain SwapChain;
     std::array<FFrameResource, FDXGISwapChain::BufferCount> FrameResources;
-    Microsoft::WRL::ComPtr<ID3D12RootSignature> OpaqueRootSignature;
-    Microsoft::WRL::ComPtr<ID3D12PipelineState> OpaquePipelineState;
+    FMeshPassPipeline MeshPassPipeline;
     std::uint32_t ViewportWidth = 0;
     std::uint32_t ViewportHeight = 0;
     bool bInitialized = false;

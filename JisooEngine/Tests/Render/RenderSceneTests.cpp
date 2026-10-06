@@ -10,6 +10,7 @@
 #include "Runtime/Render/Mesh/MeshBatch.h"
 #include "Runtime/Render/Mesh/MeshBatchCollection.h"
 #include "Runtime/Render/Mesh/MeshPass.h"
+#include "Runtime/Render/Mesh/MeshPassPipeline.h"
 #include "Runtime/Render/Scene/PrimitiveSceneProxy.h"
 #include "Runtime/Render/Scene/Scene.h"
 
@@ -45,6 +46,16 @@ namespace
 void RegisterRenderSceneTests(FTestRunner& Runner)
 {
     Runner.Add(
+        "RenderScene.MeshPassPipelineRegistersOpaquePass",
+        [](FTestContext& Test)
+        {
+            FMeshPassPipeline Pipeline;
+
+            Test.Expect(Pipeline.NumPasses() == 1, "초기 MeshPassPipeline에는 Opaque Pass 하나가 등록되어야 한다.");
+            Test.Expect(Pipeline.GetPassType(0) == EMeshPass::Opaque, "등록 순서의 첫 Pass가 Opaque여야 한다.");
+        });
+
+    Runner.Add(
         "RenderScene.TriangleProxySubmitsOpaqueMeshBatch",
         [](FTestContext& Test)
         {
@@ -64,7 +75,8 @@ void RegisterRenderSceneTests(FTestRunner& Runner)
             if (Collector.Num() == 1)
             {
                 const FMeshBatch& MeshBatch = Collector.GetMeshBatches().front();
-                const FMeshPassMask PassMask = ComputeMeshPassMask(MeshBatch);
+                const FMeshPassPipeline Pipeline;
+                const FMeshPassMask PassMask = Pipeline.ComputePassMask(MeshBatch);
                 Test.Expect(MeshBatch.Vertices.size() == 3, "Triangle MeshBatch가 정점 세 개를 참조해야 한다.");
                 Test.Expect(NearlyEqual(MeshBatch.LocalToWorld.M[3][0], 300.0f), "MeshBatch가 Proxy의 World Transform을 복사해야 한다.");
                 Test.Expect(PassMask.Contains(EMeshPass::Opaque), "Opaque Material Batch가 Opaque Pass 후보여야 한다.");

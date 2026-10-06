@@ -3,7 +3,6 @@ setlocal
 
 for %%I in ("%~dp0.") do set "ROOT_DIR=%%~fI"
 set "BUILD_DIR=%ROOT_DIR%\Build\VS2022-x64"
-set "SOLUTION_PATH=%BUILD_DIR%\JisooEngine.sln"
 set "CONFIGURATION=%~1"
 
 if "%CONFIGURATION%"=="" set "CONFIGURATION=Debug"
@@ -30,14 +29,12 @@ if errorlevel 1 (
     exit /b 1
 )
 
-if not exist "%SOLUTION_PATH%" (
-    echo Visual Studio project files were not found. Generating them now...
-    call "%ROOT_DIR%\GenerateProjectFiles.bat" -DBUILD_TESTING=ON
-    if errorlevel 1 exit /b 1
-)
+echo Ensuring test project files are configured...
+call "%ROOT_DIR%\GenerateProjectFiles.bat" -DBUILD_TESTING=ON
+if errorlevel 1 exit /b 1
 
 echo Building test targets ^(%CONFIGURATION%^) ...
-cmake --build "%BUILD_DIR%" --config "%CONFIGURATION%" --target JisooObjectSystemTests
+cmake --build "%BUILD_DIR%" --config "%CONFIGURATION%" --target JisooEngineTests
 if errorlevel 1 (
     echo [Error] Test build failed.
     exit /b 1

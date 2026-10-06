@@ -55,6 +55,11 @@ void FGameEngine::Shutdown()
     FEngine::Shutdown();
 }
 
+FInputRouteContext FGameEngine::BuildInputRouteContext()
+{
+    return {ViewportClient.get(), ViewportClient.get()};
+}
+
 void FGameEngine::RenderFrame()
 {
     FRenderer* FrameRenderer = GetRenderer();

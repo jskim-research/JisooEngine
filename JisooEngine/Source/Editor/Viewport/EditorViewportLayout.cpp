@@ -59,6 +59,11 @@ std::vector<FViewport*> FEditorViewportLayout::GetVisibleViewports() const
     return Result;
 }
 
+FEditorViewportClient* FEditorViewportLayout::GetActiveViewportClient() const noexcept
+{
+    return Slots[0] != nullptr ? Slots[0]->Client.get() : nullptr;
+}
+
 std::size_t FEditorViewportLayout::GetCreatedSlotCount() const noexcept
 {
     std::size_t Count = 0;

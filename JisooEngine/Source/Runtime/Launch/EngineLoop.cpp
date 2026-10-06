@@ -12,8 +12,10 @@ int FEngineLoop::Run(FEngine& Engine)
     constexpr std::uint32_t ClientHeight = 720;
 
     FWindowsWindow Window;
+    Window.SetInputEventSink(&Engine.GetInputEventSink());
     if (!Window.Initialize(L"JisooEngine", ClientWidth, ClientHeight))
     {
+        Window.SetInputEventSink(nullptr);
         return -1;
     }
 
@@ -24,6 +26,7 @@ int FEngineLoop::Run(FEngine& Engine)
 
     if (!Engine.Initialize(InitParams))
     {
+        Window.SetInputEventSink(nullptr);
         Engine.Shutdown();
         return -1;
     }
@@ -42,6 +45,7 @@ int FEngineLoop::Run(FEngine& Engine)
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
 
+    Window.SetInputEventSink(nullptr);
     Engine.Shutdown();
     return 0;
 }

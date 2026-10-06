@@ -77,3 +77,14 @@ Viewport 출력 표면, Client 호출 경계와 Editor Layout의 초기 확장 �
 | `Viewport.SceneViewFamilyOwnsFrameViews` | Renderer 요청이 Scene, RenderTarget Handle과 프레임별 SceneView 목록을 값으로 함께 보관하는지 확인하기 위해 |
 | `Viewport.RejectsMissingRenderTarget` | 유효한 Target Handle이 없는 Viewport가 암묵적인 기본 BackBuffer로 렌더되지 않도록 보장하기 위해 |
 | `Viewport.EditorLayoutStartsWithSingleVisibleSlot` | 초기에는 Slot 0만 생성하면서 최대 네 Slot의 Layout 구조와 Single 표시 계약을 유지하는지 확인하기 위해 |
+
+## Input
+
+플랫폼 이벤트의 프레임 상태화와 Keyboard·Pointer 입력 대상 분리 계약을 검증한다.
+
+| 검증 항목 | 이유 |
+|---|---|
+| `Input.FramePreservesHeldStateAndResetsTransitions` | Down 상태는 유지하면서 Pressed·Released와 Pointer·Wheel Delta가 한 프레임에만 남는지 확인하기 위해 |
+| `Input.FocusLossReleasesHeldKeys` | Window Focus를 잃었을 때 고착된 Keyboard·Pointer 입력이 남지 않도록 보장하기 위해 |
+| `Input.RouterSeparatesKeyboardAndPointerTargets` | UI와 다중 Viewport 확장 시 서로 다른 Keyboard·Pointer 대상에 허용된 채널만 전달되는지 확인하기 위해 |
+| `Input.RouterCallsSharedTargetOnce` | 하나의 ViewportClient가 두 채널을 모두 소유할 때 같은 프레임 입력을 중복 처리하지 않도록 보장하기 위해 |

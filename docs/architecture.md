@@ -18,6 +18,7 @@ Repository/
 │  │  │  ├─ CoreUObject/      # UObject 타입 정보, 생성·파괴와 전역 객체 추적
 │  │  │  ├─ Launch/           # FEngineLoop
 │  │  │  ├─ Platform/Windows/ # 최소 Win32 창과 메시지 처리
+│  │  │  ├─ Input/            # 플랫폼 독립 입력 상태와 Viewport 라우팅
 │  │  │  ├─ Engine/           # FEngine, Game Scene과 공통 Viewport 계층
 │  │  │  └─ Render/           # Render Scene과 D3D12 Renderer
 │  │  └─ Editor/
@@ -176,6 +177,25 @@ Pass Processor는 PSO와 Binding을 선택해 Draw Command를 만들지만 D3D12
 
 선택 이유와 검토한 대안은 [Game Scene과 Render Scene 책임 분리 결정](decisions/Game%20Scene과%20Render%20Scene%20책임%20분리%20결정.md)에 기록한다.
 
+## 입력 수집과 라우팅
+
+```text
+FWindowsWindow::WndProc
+└─ IInputEventSink (비소유)
+   └─ FEngine::FInputSystem
+      └─ FInputFrame
+         └─ FInputRouter
+            ├─ FGameViewportClient
+            └─ FEditorViewportClient
+```
+
+- `FEngine`은 `FInputSystem`과 `FInputRouter`를 소유하며 전역 Input Singleton을 사용하지 않는다.
+- `FWindowsWindow`는 Win32 메시지를 플랫폼 독립 `FInputEvent`로 바꾸고 등록된 Sink에 전달할 뿐 입력 상태와 대상을 소유하지 않는다. `FEngineLoop`가 Window와 Engine을 연결하고 Engine 종료 전에 연결을 해제한다.
+- `FInputSystem`은 Tick 사이에 도착한 이벤트를 대기 큐에 값으로 보관한다. Engine Tick 시작에 이를 순서대로 소비해 지속 `Down`, 프레임 한정 `Pressed`·`Released`, Pointer 위치·Delta, Wheel과 Focus를 `FInputFrame`으로 확정한다.
+- `FInputRouter`는 입력을 해석하지 않고 구체 Engine이 만든 `FInputRouteContext`의 Keyboard·Pointer Target에 허용된 채널만 전달한다. 같은 Client가 두 채널을 소유하면 한 번만 호출한다.
+- 현재 Game은 `FGameViewportClient`, Editor는 Single Layout의 활성 `FEditorViewportClient`를 두 채널의 Target으로 사용한다. Client의 기본 `ProcessInput`은 아무 동작도 하지 않으며 카메라와 게임 Action 해석은 후속 범위다.
+- Editor UI 도입 시 ImGui 의존 코드는 Editor 계층에만 두고, Hover·Focus·Capture와 UI 점유 결과를 중립적인 `FInputRouteContext`로 변환한다. Runtime Input Router는 ImGui 타입을 참조하지 않는다.
+
 ## Viewport와 View 렌더 요청
 
 Viewport 출력 표면, 사용 정책과 프레임 로컬 렌더 데이터를 분리한다.
@@ -197,13 +217,13 @@ FEditorEngine
 - `FViewport`는 Renderer가 발급한 `FRenderTargetHandle`과 pixel 크기, 비소유 Client 연결과 Draw 진입점을 보관한다. 실제 RenderTarget GPU 자원은 Renderer가 소유하며 Viewport는 직접 참조하지 않는다.
 - `FViewportClient`는 Scene 비소유 참조, Camera와 ViewMode를 지속 상태로 보관하고 `FSceneViewFamily`와 `FSceneView`를 프레임 값으로 만들어 Renderer에 즉시 제출한다. `FViewport::Draw`는 이 Client 호출을 전달할 뿐 렌더 정책을 소유하지 않는다.
 - `FSceneViewFamily`는 동일한 Scene, `FRenderTargetHandle`, 출력 크기와 ViewMode를 공유하는 렌더 요청이며 하나 이상의 `FSceneView`를 값으로 소유한다. `FSceneView`는 View·Projection, ViewRect와 CameraPosition의 프레임 스냅숏이다.
-- `FEditorViewportLayout`은 최대 네 Slot의 수명과 배치·표시 정책을 소유하고 Renderer를 참조하지 않는다. 현재는 Single 모드의 Slot 0만 생성한다.
+- `FEditorViewportLayout`은 최대 네 Slot의 수명과 배치·표시 정책 및 활성 Client 조회를 소유하고 Renderer를 참조하지 않는다. 현재는 Single 모드의 Slot 0만 생성하고 활성 대상으로 사용한다.
 - Editor와 Game의 구체 Engine은 World Tick 이후 Renderer 프레임을 열고, 표시할 Viewport의 Draw 진입점을 호출한 뒤 프레임을 닫는다. Client는 Family 제출만 하며 BeginFrame, EndFrame과 Present를 제어하지 않는다.
 - Renderer는 `Index + Generation` Target Handle을 내부 슬롯으로 해석한다. 현재 Main Target 슬롯은 프레임 시작에 DXGI가 선택한 BackBuffer와 RTV에 연결되며, 같은 Handle이라도 실제 BackBuffer는 프레임마다 달라질 수 있다.
 - Renderer는 `BeginFrame -> RenderViewFamily 1..N -> EndFrame` 순서를 제공한다. `RenderViewFamily`는 Family가 지정한 Target을 최초 사용할 때 RenderTarget 상태로 전환·Clear하고 `FMeshPassPipeline`을 실행하며, EndFrame은 사용한 Target을 최종 상태로 되돌린 뒤 프레임당 한 번 제출·Present·Fence signal한다.
 - View와 Projection은 왼손 좌표계, +X Forward, +Y Right, +Z Up과 행벡터 규칙을 따르며 `View * Projection` 순서로 합성한다.
 
-Editor UI 도입 시 Renderer가 off-screen Color·Depth Target과 SRV를 생성·등록하고 발급한 Handle을 Layout Slot에 연결한다. ImGui Panel은 Slot을 소유하지 않고 content pixel 크기와 interaction 상태를 Layout/Viewport에 전달한다. 실제 2·4분할 활성화, 입력 라우팅, Grid·Gizmo와 Wireframe·Depth·WorldNormal Pass는 아직 포함하지 않는다.
+Editor UI 도입 시 Renderer가 off-screen Color·Depth Target과 SRV를 생성·등록하고 발급한 Handle을 Layout Slot에 연결한다. ImGui Panel은 Slot을 소유하지 않고 content pixel 크기와 interaction 상태를 Layout/Viewport에 전달한다. 실제 2·4분할 활성화, UI Hit Test·Focus·Capture 연결, Grid·Gizmo와 Wireframe·Depth·WorldNormal Pass는 아직 포함하지 않는다.
 
 ## 코드 배치 기준
 
@@ -251,7 +271,7 @@ JisooGameEditor.exe -> main.cpp -> FEngineLoop.Run(FEditorEngine)
 
 현재 `FEngineLoop`는 최소 Win32 창을 생성하고 메시지를 처리하며 `steady_clock`으로 DeltaSeconds를 계산해, 창을 닫을 때까지 `FEngine::Tick`을 반복 호출한 뒤 종료한다. `FWindowsWindow`는 창과 네이티브 핸들을 소유하지만 범용 Application 계층은 두지 않는다.
 
-`FEngine`은 World Handle 목록과 D3D12 전용 `FRenderer`를 소유한다. 각 `UWorld`는 CPU-side `FScene`을 소유한다. 한 프레임은 World Tick → 구체 Engine의 Viewport Render → Pending UObject Flush 순서로 처리하므로 현재 Single Thread에서는 World Tick 동안 Scene 갱신을 끝내고 Renderer 구간에는 읽기 전용으로 취급한다. 종료할 때는 구체 Engine이 Viewport·Client를 해제한 뒤 World 파괴와 Pending UObject Flush를 수행하고 Renderer를 종료한다. `FRenderer`는 RHI나 그래픽 API 다형성 계층 없이 `FD3D12Device`, `FD3D12CommandContext`, `FDXGISwapChain`, RenderTarget Handle 슬롯, 프레임별 `FFrameResource`와 `FMeshPassPipeline`을 합성한다. 현재 렌더링 범위는 Family가 지정한 Target의 상태 전환과 Clear, View별 Visible MeshBatch 수집, 순서가 있는 단일 Opaque Mesh Pass의 Draw Command 생성·기록, Present와 Fence 기반 프레임 자원 재사용까지다.
+`FEngine`은 Input System·Router, World Handle 목록과 D3D12 전용 `FRenderer`를 소유한다. 각 `UWorld`는 CPU-side `FScene`을 소유한다. 한 프레임은 Input Frame 확정·라우팅 → World Tick → 구체 Engine의 Viewport Render → Pending UObject Flush 순서로 처리하므로 현재 Single Thread에서는 World Tick 동안 Scene 갱신을 끝내고 Renderer 구간에는 읽기 전용으로 취급한다. 종료할 때는 Window의 입력 Sink 연결을 먼저 끊고, 구체 Engine이 Viewport·Client를 해제한 뒤 World 파괴와 Pending UObject Flush를 수행하고 Renderer를 종료한다. `FRenderer`는 RHI나 그래픽 API 다형성 계층 없이 `FD3D12Device`, `FD3D12CommandContext`, `FDXGISwapChain`, RenderTarget Handle 슬롯, 프레임별 `FFrameResource`와 `FMeshPassPipeline`을 합성한다. 현재 렌더링 범위는 Family가 지정한 Target의 상태 전환과 Clear, View별 Visible MeshBatch 수집, 순서가 있는 단일 Opaque Mesh Pass의 Draw Command 생성·기록, Present와 Fence 기반 프레임 자원 재사용까지다.
 
 첫 수직 검증에서는 ViewportClient가 만드는 고정 View·Projection과 `UTriangleComponent`를 사용한다. Frustum이 아직 없으므로 Primitive Visibility는 `IsVisible()`만 검사하고, 앞면 winding이 확정되지 않아 Opaque PSO의 Cull Mode는 None이다. 기본 World에 생성하는 `RenderValidationTriangle`은 Game 시작 Scene 연결 전까지 실제 실행 경로를 검증하기 위한 임시 콘텐츠다.
 

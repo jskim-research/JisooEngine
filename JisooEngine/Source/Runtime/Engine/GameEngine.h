@@ -18,6 +18,7 @@ public:
     void Shutdown() override;
 
 protected:
+    [[nodiscard]] FInputRouteContext BuildInputRouteContext() override;
     void RenderFrame() override;
 
 private:

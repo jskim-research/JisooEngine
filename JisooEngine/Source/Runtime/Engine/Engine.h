@@ -1,6 +1,8 @@
 #pragma once
 
 #include "Runtime/CoreUObject/ObjectHandle.h"
+#include "Runtime/Input/InputRouter.h"
+#include "Runtime/Input/InputSystem.h"
 
 #include <cstdint>
 #include <memory>
@@ -51,13 +53,21 @@ public:
 
     [[nodiscard]] std::vector<UWorld*> GetWorlds() const;
 
+    /** Window가 입력 이벤트를 전달할 비소유 연결 지점을 반환한다. */
+    [[nodiscard]] IInputEventSink& GetInputEventSink() noexcept;
+
 protected:
+    /** 현재 실행 모드의 Focus와 Capture 정책으로 이번 프레임 입력 대상을 선택한다. */
+    [[nodiscard]] virtual FInputRouteContext BuildInputRouteContext();
+
     /** World Tick 이후 구체 Engine이 Viewport 렌더 요청을 제출하는 프레임 단계다. */
     virtual void RenderFrame();
 
     [[nodiscard]] FRenderer* GetRenderer() const noexcept;
 
 private:
+    FInputSystem InputSystem;
+    FInputRouter InputRouter;
     std::unique_ptr<FRenderer> Renderer;
     std::vector<FObjectHandle> Worlds;
     bool bInitialized = false;

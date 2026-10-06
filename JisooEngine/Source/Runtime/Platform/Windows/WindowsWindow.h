@@ -4,9 +4,11 @@
 
 #include <cstdint>
 
+class IInputEventSink;
+
 /**
  * Win32 Window Class와 Window Handle을 소유하고 현재 Thread의 Message를 처리한다.
- * 생성한 Window가 파괴되면 Native Handle을 무효화한다.
+ * 생성한 Window가 파괴되면 Native Handle을 무효화하며 입력 Sink는 소유하지 않는다.
  */
 class FWindowsWindow
 {
@@ -35,6 +37,9 @@ public:
     bool ProcessMessages();
     void Shutdown();
 
+    /** Sink는 Window보다 오래 살아야 하며, 해제 전 nullptr로 연결을 끊어야 한다. */
+    void SetInputEventSink(IInputEventSink* InInputEventSink) noexcept;
+
     HWND GetNativeHandle() const noexcept;
 
 private:
@@ -43,4 +48,8 @@ private:
     HINSTANCE InstanceHandle = nullptr;
     HWND WindowHandle = nullptr;
     ATOM WindowClassAtom = 0;
+    IInputEventSink* InputEventSink = nullptr;
+    std::int32_t LastPointerX = 0;
+    std::int32_t LastPointerY = 0;
+    bool bHasPointerPosition = false;
 };

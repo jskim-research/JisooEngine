@@ -6,6 +6,10 @@
 #include <cmath>
 #include <numbers>
 
+void FViewportClient::ProcessInput(const FInputFrame&, float)
+{
+}
+
 void FViewportClient::Draw(FViewport& Viewport, FRenderer& Renderer)
 {
     if (Scene == nullptr || !Viewport.IsRenderable())

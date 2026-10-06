@@ -1,5 +1,6 @@
 #include "Editor/Engine/EditorEngine.h"
 
+#include "Editor/Viewport/EditorViewportClient.h"
 #include "Editor/Viewport/EditorViewportLayout.h"
 #include "Runtime/Engine/Viewport/Viewport.h"
 #include "Runtime/Engine/World.h"
@@ -45,6 +46,17 @@ void FEditorEngine::Shutdown()
 {
     ViewportLayout.reset();
     FEngine::Shutdown();
+}
+
+FInputRouteContext FEditorEngine::BuildInputRouteContext()
+{
+    if (ViewportLayout == nullptr)
+    {
+        return {};
+    }
+
+    FEditorViewportClient* ActiveClient = ViewportLayout->GetActiveViewportClient();
+    return {ActiveClient, ActiveClient};
 }
 
 void FEditorEngine::RenderFrame()

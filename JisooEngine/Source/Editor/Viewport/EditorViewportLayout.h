@@ -51,6 +51,7 @@ public:
     void Shutdown();
 
     [[nodiscard]] std::vector<FViewport*> GetVisibleViewports() const;
+    [[nodiscard]] FEditorViewportClient* GetActiveViewportClient() const noexcept;
     [[nodiscard]] std::size_t GetCreatedSlotCount() const noexcept;
     [[nodiscard]] EEditorViewportLayoutMode GetLayoutMode() const noexcept;
 
